@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/AppIcone.png" alt="OdontOC Logo" width="120" />
+  <img src="public/AppLogo.png" alt="OdontOC Logo" width="240" />
   
   # OdontOC - Gestão Odontológica Inteligente
 
