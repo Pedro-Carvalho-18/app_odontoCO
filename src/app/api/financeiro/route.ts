@@ -12,11 +12,13 @@ export async function GET(request: Request) {
     const end = endDate || '2100-12-31';
 
     // 1. Receitas de Pacientes (CCPACIENTE)
+    // Filtramos apenas lançamentos de PAGAMENTO (NROLAN 6, 7, 8)
+    // Excluímos lançamentos de DÉBITO/LANÇAMENTO (NROLAN 4, 5) para evitar duplicatas semânticas
     const patientIncome = await db.all(
       `SELECT 
-        'p-' || C.REGISTRO as id,
+        'p-' || MAX(C.REGISTRO) as id,
         C.DATA as date,
-        C.HISTORICO as description,
+        MAX(C.HISTORICO) as description,
         C.VALOR as value,
         P.PRINOM as patientName,
         TP.NOME as paymentMethod,
@@ -25,6 +27,8 @@ export async function GET(request: Request) {
       LEFT JOIN PESSOAL P ON C.NROPAC = P.NROPAC
       LEFT JOIN __TIPO_PAGTO TP ON C.TIPO_PAGTO = TP.REGISTRO
       WHERE DATE(C.DATA) BETWEEN DATE(?) AND DATE(?)
+      AND C.NROLAN IN ('6', '7', '8', '105') 
+      GROUP BY C.NROPAC, DATE(C.DATA), C.VALOR
       ORDER BY C.DATA DESC`,
       [start, end]
     );
@@ -32,9 +36,9 @@ export async function GET(request: Request) {
     // 2. Movimentações do Cirurgião (CCCIRURGIAO)
     const surgeonMoves = await db.all(
       `SELECT 
-        'c-' || C.REGISTRO as id,
+        'c-' || MAX(C.REGISTRO) as id,
         C.DATA as date,
-        C.HISTORICO as description,
+        MAX(C.HISTORICO) as description,
         C.VALOR as value,
         PR.NOME as professionalName,
         C.NROLAN as code,
@@ -45,68 +49,61 @@ export async function GET(request: Request) {
       FROM CCCIRURGIAO C
       LEFT JOIN PRESTADOR PR ON C.ID_PRESTADOR = PR.ID_PRESTADOR
       WHERE DATE(C.DATA) BETWEEN DATE(?) AND DATE(?)
+      AND (C.NROCCPAC IS NULL OR C.NROCCPAC = '' OR C.NROCCPAC = '0')
+      GROUP BY C.ID_PRESTADOR, DATE(C.DATA), C.VALOR, C.NROLAN
       ORDER BY C.DATA DESC`,
       [start, end]
     );
 
-    // 3. Saldo Pendente (Total que falta receber de todos os pacientes)
-    const pendingInterventions = await db.all(`
+    // 3. Saldo Pendente Global (Cálculo via Conta Corrente)
+    // Pendente = (Soma de Lançamentos de Débito) - (Soma de Pagamentos Realizados)
+    // Filtramos para dados a partir do ano 2000 para evitar resquícios de moedas antigas/inflação (Cruzeiro)
+    const ledgerBalance = await db.get(`
       SELECT 
-        CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT) as value,
-        I.ORCAMENTO as paidInst,
-        I.OBSERV as notes,
-        I.NROINTPAC,
-        I.STATUS,
-        I.DATCAD as date,
-        TRIM(P.PRINOM || ' ' || COALESCE(P.SEGNOM, '')) as patientName
-      FROM INTERVENCAO I
-      LEFT JOIN PESSOAL P ON I.NROPAC = P.NROPAC
-      WHERE I.STATUS != '3' -- Ignorar cancelados
-      AND (I.VALOR_PACIENTE > 0 OR I.STATUS = '1')
+        SUM(CASE WHEN NROLAN IN ('4', '5') THEN VALOR ELSE 0 END) as totalCharges,
+        SUM(CASE WHEN NROLAN IN ('6', '7', '8', '105') THEN VALOR ELSE 0 END) as totalPayments
+      FROM CCPACIENTE
+      WHERE STRFTIME('%Y', DATA) >= '2000'
+    `);
+    
+    const totalPending = Math.max(0, (ledgerBalance?.totalCharges || 0) - (ledgerBalance?.totalPayments || 0));
+
+    // 4. Lista de Detalhes Pendentes (Itemizada via Conta Corrente)
+    // Buscamos cada tratamento (NROTRA) que ainda possui saldo devedor
+    const pendingList = await db.all(`
+      SELECT 
+        C.NROTRA,
+        C.NROPAC,
+        MAX(C.DATA) as lastDate,
+        MAX(C.HISTORICO) as description,
+        SUM(CASE WHEN NROLAN IN ('4', '5') THEN VALOR ELSE 0 END) - 
+        SUM(CASE WHEN NROLAN IN ('6', '7', '8', '105') THEN VALOR ELSE 0 END) as balance,
+        P.PRINOM as patientName
+      FROM CCPACIENTE C
+      LEFT JOIN PESSOAL P ON C.NROPAC = P.NROPAC
+      WHERE STRFTIME('%Y', C.DATA) >= '2000'
+      AND C.NROTRA IS NOT NULL AND C.NROTRA != '0'
+      GROUP BY C.NROPAC, C.NROTRA
+      HAVING balance > 0.01
+      ORDER BY lastDate DESC
     `);
 
     const pendingTransactions: any[] = [];
     let globalCounter = 0;
-    const totalPending = pendingInterventions.reduce((sum, inter) => {
-      // Tenta extrair o total de parcelas do OBSERV (X/Yx) ou (Yx)
-      let total = 1;
-      const notes = inter.notes || "";
-      const procName = notes.split('|')[0].replace('PROCEDIMENTO:', '').trim() || 'Procedimento';
-      
-      // Regex aprimorada: (3x), (3 x), (1/3x), (1/3 X)
-      const installmentRegex = /(?:\/|\()(\d+)\s*x\)/i;
-      const match = notes.match(installmentRegex);
-      if (match) {
-        total = parseInt(match[1]) || 1;
-      }
+    
+    for (const item of pendingList) {
+      globalCounter++;
+      pendingTransactions.push({
+        id: `pending-item-${globalCounter}-${item.NROTRA}-${item.NROPAC}`,
+        date: item.lastDate || new Date().toISOString(),
+        description: `A RECEBER: ${item.description || 'Tratamento'}`,
+        value: item.balance,
+        patientName: item.patientName,
+        type: 'pending'
+      });
+    }
 
-      const paid = parseInt(inter.paidInst || '0') || 0;
-      
-      // Se for Status 1 (Em Aberto) e não tiver parcelas marcadas como pagas, 
-      // ou se tiver parcelas a pagar
-      if (paid < total || (inter.STATUS === '1' && paid === 0)) {
-        const valPerInst = (inter.value || 0) / (total || 1);
-        const unpaidCount = Math.max(0, total - paid);
-        
-        if (unpaidCount > 0 && valPerInst > 0) {
-          for (let i = paid + 1; i <= total; i++) {
-             globalCounter++;
-             pendingTransactions.push({
-                id: `pending-item-${globalCounter}-${inter.NROINTPAC || 'no-id'}`,
-                date: inter.date || new Date().toISOString(),
-                description: `A RECEBER: Parcela ${i}/${total} - ${inter.patientName} - ${procName}`,
-                value: valPerInst,
-                patientName: inter.patientName,
-                type: 'pending'
-             });
-          }
-          return sum + (valPerInst * unpaidCount);
-        }
-      }
-      return sum;
-    }, 0);
-
-    // 4. Totais e Resumo
+    // 5. Totais e Resumo
     const allTransactions = [...patientIncome, ...surgeonMoves].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     const totalIncome = allTransactions.reduce((sum, item) => item.type === 'income' ? sum + parseFloat(item.value || 0) : sum, 0);

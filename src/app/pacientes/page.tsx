@@ -1,27 +1,18 @@
 "use client";
 
 import { 
-  Plus, 
   Search, 
-  Filter, 
   MoreHorizontal, 
   UserPlus,
   Users,
   Mail,
   Phone,
   X,
-  FileText,
-  Calendar,
-  History,
-  DollarSign,
   Loader2,
-  HeartPulse,
-  AlertTriangle,
-  Stethoscope
+  HeartPulse
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -48,8 +39,7 @@ export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
+  const isFetchingRef = useRef(false);
 
   // New Patient State
   const [showNewModal, setShowNewModal] = useState(false);
@@ -92,8 +82,11 @@ export default function PatientsPage() {
   };
 
   const fetchPatients = async (query = "", pageNum = 1, append = false) => {
+    if (isFetchingRef.current) return;
+    
     if (pageNum === 1) setLoading(true);
     else setLoadingMore(true);
+    isFetchingRef.current = true;
     
     try {
       const res = await fetch(`/api/pacientes?q=${query}&page=${pageNum}&limit=50`);
@@ -113,6 +106,7 @@ export default function PatientsPage() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -127,7 +121,7 @@ export default function PatientsPage() {
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight + 100 && !loadingMore && hasMore) {
+    if (scrollHeight - scrollTop <= clientHeight + 200 && !isFetchingRef.current && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
       fetchPatients(searchTerm, nextPage, true);
@@ -183,7 +177,7 @@ export default function PatientsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-4 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-4">
       {/* Header Modernizado */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">

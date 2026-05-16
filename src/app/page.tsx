@@ -94,6 +94,8 @@ export default function PatientRecordPage() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('lastSelectedPatient');
@@ -324,24 +326,52 @@ export default function PatientRecordPage() {
     setShowPrescriptionModal(false);
   };
 
+  const fetchPatients = useCallback(async (pageNum = 1, query = "", append = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (pageNum === 1) setLoadingPatients(true);
+    else setLoadingMore(true);
+
+    try {
+      const res = await fetch(`/api/pacientes?page=${pageNum}&q=${query}&limit=20`);
+      const data = await res.json();
+      const patientsList = data?.patients || [];
+      
+      if (append) {
+        setPatients(prev => [...prev, ...patientsList]);
+      } else {
+        setPatients(patientsList);
+        if (patientsList.length > 0 && !selectedPatient && pageNum === 1) {
+          // setSelectedPatient(patientsList[0]); // Don't auto-select to avoid surprising the user
+        }
+      }
+      setHasMore(data?.hasMore ?? false);
+    } catch (err) { 
+      console.error(err); 
+    } finally { 
+      setLoadingPatients(false); 
+      setLoadingMore(false);
+      isFetchingRef.current = false;
+    }
+  }, [selectedPatient]);
+
   useEffect(() => {
     if (!initialLoadDone) return;
-    async function loadPatients() {
-      try {
-        const res = await fetch(`/api/pacientes?page=${page}&q=${searchTerm}`);
-        const data = await res.json();
-        const patientsList = data?.patients || [];
-        if (page === 1) {
-          setPatients(patientsList);
-          if (patientsList.length > 0 && !selectedPatient) setSelectedPatient(patientsList[0]);
-        } else {
-          setPatients(prev => [...prev, ...patientsList]);
-        }
-        setHasMore(data?.hasMore ?? false);
-      } catch (err) { console.error(err); } finally { setLoadingPatients(false); }
+    const delayDebounceFn = setTimeout(() => {
+      setPage(1);
+      fetchPatients(1, searchTerm, false);
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, initialLoadDone, fetchPatients]);
+
+  const handleSearchScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && !isFetchingRef.current && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchPatients(nextPage, searchTerm, true);
     }
-    loadPatients();
-  }, [searchTerm, page, selectedPatient, initialLoadDone]);
+  };
 
   useEffect(() => {
     async function loadCatalog() {
@@ -553,20 +583,28 @@ export default function PatientRecordPage() {
   if (!selectedPatient && !loadingPatients) return <div className="p-20 text-center font-black uppercase text-slate-400">Carregando...</div>;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
+    <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans">
       <header className="w-full px-6 py-2 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 z-50 shadow-sm gap-4">
         {/* ... existing header content ... */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)} className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold outline-none" />
           {(isSearchFocused || searchTerm) && patients.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto">
+            <div 
+              className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto custom-scrollbar"
+              onScroll={handleSearchScroll}
+            >
               {patients.map(p => (
                 <button key={p.id} onClick={() => {setSelectedPatient(p); setSearchTerm("");}} className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-xs font-black">{p.name[0]}</div>
                   <span className="font-black text-xs uppercase">{p.name}</span>
                 </button>
               ))}
+              {loadingMore && (
+                <div className="p-3 text-center">
+                  <Loader2 size={16} className="animate-spin mx-auto text-blue-600" />
+                </div>
+              )}
             </div>
           )}
         </div>

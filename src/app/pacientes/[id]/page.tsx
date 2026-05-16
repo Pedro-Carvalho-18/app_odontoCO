@@ -253,7 +253,8 @@ function PatientProfileContent() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+    <div className="h-full overflow-y-auto custom-scrollbar p-6">
+      <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Detalhes do Item Modal */}
       {selectedItem && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1196,6 +1197,7 @@ function PatientProfileContent() {
           initialSelectedIntervention={initialFilesIntervention}
         />
       )}
+      </div>
     </div>
   );
 }

@@ -15,7 +15,9 @@ import {
   History,
   Plus,
   X,
-  Download
+  Download,
+  Check,
+  Ban
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -164,6 +166,48 @@ export default function FinanceiroPage() {
     }
   };
 
+  const handleMarkPaid = async (item: any) => {
+    if (!confirm(`Confirmar recebimento de ${formatCurrency(item.value)}? Isso gerará uma entrada no caixa.`)) return;
+    // O ID de pendência é formatado como 'pending-item-counter-nroTra-nroPac'
+    const parts = item.id.split('-');
+    const nroTra = parts[parts.length - 2];
+    const nroPac = parts[parts.length - 1];
+
+    try {
+      const res = await fetch('/api/financeiro/pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          nroTra, 
+          nroPac,
+          value: item.value,
+          description: item.description.replace('A RECEBER: ', 'Pg ')
+        })
+      });
+      if (res.ok) fetchFinance();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCancelPending = async (item: any) => {
+    if (!confirm("Deseja realmente remover esta pendência? Isso anulará o débito original.")) return;
+    const parts = item.id.split('-');
+    const nroTra = parts[parts.length - 2];
+    const nroPac = parts[parts.length - 1];
+
+    try {
+      const res = await fetch('/api/financeiro/cancelar-pendencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nroTra, nroPac })
+      });
+      if (res.ok) fetchFinance();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDownloadReport = () => {
     if (!filteredTransactions || filteredTransactions.length === 0) {
       alert("Nenhum dado para exportar.");
@@ -219,16 +263,16 @@ export default function FinanceiroPage() {
   })();
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-6 overflow-hidden relative">
+    <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-4 overflow-hidden relative">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-[28px] border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-600 rounded-2xl text-white shadow-lg shadow-emerald-100">
-            <DollarSign size={24} />
+          <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-100">
+            <DollarSign size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">Financeiro</h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Controle de caixa e faturamento</p>
+            <h1 className="text-lg font-black text-slate-900 uppercase tracking-tight">Financeiro</h1>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Controle de caixa e faturamento</p>
           </div>
         </div>
 
@@ -236,116 +280,116 @@ export default function FinanceiroPage() {
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
              <input 
               type="date" 
-              className="bg-transparent border-none text-[10px] font-black uppercase text-slate-600 px-3 py-2 outline-none"
+              className="bg-transparent border-none text-[9px] font-black uppercase text-slate-600 px-2 py-1.5 outline-none"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
              />
-             <div className="w-px h-4 bg-slate-300 self-center"></div>
+             <div className="w-px h-3 bg-slate-300 self-center"></div>
              <input 
               type="date" 
-              className="bg-transparent border-none text-[10px] font-black uppercase text-slate-600 px-3 py-2 outline-none"
+              className="bg-transparent border-none text-[9px] font-black uppercase text-slate-600 px-2 py-1.5 outline-none"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
              />
           </div>
           <button 
             onClick={handleDownloadReport}
-            className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
           >
-            <Download size={16} />
-            Baixar Relatório
+            <Download size={14} />
+            Relatório
           </button>
           <button 
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
           >
-            <Plus size={16} />
-            Lançar Movimentação
+            <Plus size={14} />
+            Novo Lançamento
           </button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <button 
           onClick={() => setFilterMode('income')}
           className={cn(
-            "bg-white p-6 rounded-[40px] border transition-all text-left group",
+            "bg-white px-4 py-3 rounded-[24px] border transition-all text-left group",
             filterMode === 'income' ? "border-emerald-500 ring-4 ring-emerald-50" : "border-slate-200 hover:border-emerald-200"
           )}
         >
-           <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
-                 <ArrowUpCircle size={24} />
+           <div className="flex items-center justify-between mb-2">
+              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform">
+                 <ArrowUpCircle size={16} />
               </div>
-              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg">Entradas</span>
+              <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md">Entradas</span>
            </div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Faturamento Bruto</p>
-              <h2 className="text-xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.income || 0)}</h2>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Faturamento Bruto</p>
+              <h2 className="text-base font-black text-slate-900 mt-0.5">{loading ? "---" : formatCurrency(data?.summary?.income || 0)}</h2>
            </div>
         </button>
 
         <button 
           onClick={() => setFilterMode('expense')}
           className={cn(
-            "bg-white p-6 rounded-[40px] border transition-all text-left group",
+            "bg-white px-4 py-3 rounded-[24px] border transition-all text-left group",
             filterMode === 'expense' ? "border-rose-500 ring-4 ring-rose-50" : "border-slate-200 hover:border-rose-200"
           )}
         >
-           <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl group-hover:scale-110 transition-transform">
-                 <ArrowDownCircle size={24} />
+           <div className="flex items-center justify-between mb-2">
+              <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg group-hover:scale-110 transition-transform">
+                 <ArrowDownCircle size={16} />
               </div>
-              <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded-lg">Saídas</span>
+              <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">Saídas</span>
            </div>
            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Custos / Despesas</p>
-              <h2 className="text-xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.expenses || 0)}</h2>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Custos / Despesas</p>
+              <h2 className="text-base font-black text-slate-900 mt-0.5">{loading ? "---" : formatCurrency(data?.summary?.expenses || 0)}</h2>
            </div>
         </button>
 
         <button 
           onClick={() => setFilterMode('all')}
           className={cn(
-            "p-6 rounded-[40px] shadow-xl transition-all text-left group",
+            "px-4 py-3 rounded-[24px] shadow-lg transition-all text-left group",
             filterMode === 'all' ? "bg-blue-600 text-white shadow-blue-200 ring-4 ring-blue-50" : "bg-white border border-slate-200 text-slate-900 hover:border-blue-200"
           )}
         >
-           <div className="flex items-center justify-between mb-4">
-              <div className={cn("p-3 rounded-2xl group-hover:scale-110 transition-transform", filterMode === 'all' ? "bg-white/20" : "bg-blue-50 text-blue-600")}>
-                 <Wallet size={24} />
+           <div className="flex items-center justify-between mb-2">
+              <div className={cn("p-1.5 rounded-lg group-hover:scale-110 transition-transform", filterMode === 'all' ? "bg-white/20" : "bg-blue-50 text-blue-600")}>
+                 <Wallet size={16} />
               </div>
-              <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg", filterMode === 'all' ? "bg-white/10" : "bg-blue-50 text-blue-600")}>Saldo</span>
+              <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md", filterMode === 'all' ? "bg-white/10" : "bg-blue-50 text-blue-600")}>Saldo</span>
            </div>
            <div>
-              <p className={cn("text-[10px] font-black uppercase tracking-widest", filterMode === 'all' ? "text-blue-100" : "text-slate-400")}>Lucro Líquido</p>
-              <h2 className="text-xl font-black mt-1">{loading ? "---" : formatCurrency(data?.summary?.balance || 0)}</h2>
+              <p className={cn("text-[8px] font-black uppercase tracking-widest", filterMode === 'all' ? "text-blue-100" : "text-slate-400")}>Lucro Líquido</p>
+              <h2 className="text-base font-black mt-0.5">{loading ? "---" : formatCurrency(data?.summary?.balance || 0)}</h2>
            </div>
         </button>
 
         <button 
           onClick={() => setFilterMode('pending')}
           className={cn(
-            "p-6 rounded-[40px] border transition-all text-left group",
-            filterMode === 'pending' ? "bg-amber-500 border-amber-500 text-white shadow-xl shadow-amber-100 ring-4 ring-amber-50" : "bg-amber-50 border-amber-100 text-slate-900 hover:border-amber-300"
+            "px-4 py-3 rounded-[24px] border transition-all text-left group",
+            filterMode === 'pending' ? "bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-100 ring-4 ring-amber-50" : "bg-amber-50 border-amber-100 text-slate-900 hover:border-amber-300"
           )}
         >
-           <div className="flex items-center justify-between mb-4">
-              <div className={cn("p-3 rounded-2xl group-hover:scale-110 transition-transform", filterMode === 'pending' ? "bg-white/20" : "bg-white shadow-sm text-amber-600")}>
-                 <TrendingUp size={24} />
+           <div className="flex items-center justify-between mb-2">
+              <div className={cn("p-1.5 rounded-lg group-hover:scale-110 transition-transform", filterMode === 'pending' ? "bg-white/20" : "bg-white shadow-sm text-amber-600")}>
+                 <TrendingUp size={16} />
               </div>
-              <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg", filterMode === 'pending' ? "bg-white/10 text-white" : "bg-amber-100 text-amber-700")}>A Receber</span>
+              <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md", filterMode === 'pending' ? "bg-white/10 text-white" : "bg-amber-100 text-amber-700")}>A Receber</span>
            </div>
            <div>
-              <p className={cn("text-[10px] font-black uppercase tracking-widest", filterMode === 'pending' ? "text-amber-100" : "text-amber-600/70")}>Saldo Pendente</p>
-              <h2 className="text-xl font-black mt-1">{loading ? "---" : formatCurrency(data?.summary?.pending || 0)}</h2>
+              <p className={cn("text-[8px] font-black uppercase tracking-widest", filterMode === 'pending' ? "text-amber-100" : "text-amber-600/70")}>Saldo Pendente</p>
+              <h2 className="text-base font-black mt-0.5">{loading ? "---" : formatCurrency(data?.summary?.pending || 0)}</h2>
            </div>
         </button>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <History size={18} className="text-slate-400" />
@@ -387,15 +431,15 @@ export default function FinanceiroPage() {
                <p className="font-black uppercase text-xs tracking-widest">Nenhum registro encontrado</p>
             </div>
           ) : (
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="sticky top-0 bg-white border-b border-slate-50">
                  <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="px-8 py-4 text-left">Data</th>
-                    <th className="px-8 py-4 text-left">Descrição</th>
-                    <th className="px-8 py-4 text-left">Origem / Destino</th>
-                    <th className="px-8 py-4 text-left">Tipo de Pagto</th>
-                    <th className="px-8 py-4 text-right">Valor</th>
-                    <th className="px-8 py-4 text-center">Ações</th>
+                    <th className="w-24 px-4 py-4 text-left">Data</th>
+                    <th className="px-4 py-4 text-left">Descrição</th>
+                    <th className="w-48 px-4 py-4 text-left">Origem / Destino</th>
+                    <th className="w-32 px-4 py-4 text-left">Tipo Pagto</th>
+                    <th className="w-32 px-4 py-4 text-right">Valor</th>
+                    <th className="w-20 px-4 py-4 text-center">Ações</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -405,51 +449,68 @@ export default function FinanceiroPage() {
                     onClick={() => setSelectedTransaction(t)}
                     className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
                    >
-                      <td className="px-8 py-5">
-                         <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">
+                      <td className="px-4 py-4">
+                         <span className="text-[9px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg whitespace-nowrap">
                            {new Date(t.date).toLocaleDateString('pt-BR')}
                          </span>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 py-4">
                          <p className={cn(
-                            "text-xs font-bold uppercase leading-snug",
+                            "text-[11px] font-bold uppercase leading-snug truncate",
                             t.type === 'pending' ? "text-amber-700/70" : "text-slate-800"
-                         )}>{t.description || "Pagamento de Procedimento"}</p>
+                         )} title={t.description}>{t.description || "Pagamento de Procedimento"}</p>
                       </td>
-                      <td className="px-8 py-5">
-                         <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-white transition-all uppercase">
+                      <td className="px-4 py-4">
+                         <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="flex-shrink-0 w-5 h-5 rounded bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-400 group-hover:bg-white transition-all uppercase">
                                {(t.patientName || t.professionalName || t.source === 'income' ? 'P' : 'C')[0]}
                             </div>
-                            <span className="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[150px]">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase truncate">
                                {t.patientName || t.professionalName || "Clínica"}
                             </span>
                          </div>
                       </td>
-                      <td className="px-8 py-5">
-                         <div className="flex items-center gap-1.5 text-slate-500">
-                            <CreditCard size={12} />
-                            <span className="text-[10px] font-black uppercase tracking-tight">{t.paymentMethod || (t.type === 'pending' ? "PENDENTE" : "---")}</span>
+                      <td className="px-4 py-4">
+                         <div className="flex items-center gap-1.5 text-slate-500 overflow-hidden">
+                            <CreditCard size={11} className="flex-shrink-0" />
+                            <span className="text-[9px] font-black uppercase tracking-tight truncate">{t.paymentMethod || (t.type === 'pending' ? "PENDENTE" : "---")}</span>
                          </div>
                       </td>
-                      <td className="px-8 py-5 text-right">
+                      <td className="px-4 py-4 text-right">
                          <span className={cn(
-                           "text-xs font-black",
+                           "text-[11px] font-black whitespace-nowrap",
                            t.type === 'income' ? "text-emerald-600" : 
                            t.type === 'expense' ? "text-rose-600" : "text-amber-500"
                          )}>
                             {t.type === 'income' ? "+" : t.type === 'expense' ? "-" : "≈"} {formatCurrency(parseFloat(t.value))}
                          </span>
                       </td>
-                      <td className="px-8 py-5 text-center">
-                        {t.type !== 'pending' && (
+                      <td className="px-4 py-4 text-center">
+                        {filterMode !== 'pending' ? (
                           <button 
-                            onClick={() => handleDelete(t.id, t.type)}
-                            className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.type); }}
+                            className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                             title="Excluir Lançamento"
                           >
-                            <X size={16} />
+                            <X size={14} />
                           </button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleMarkPaid(t); }}
+                              className="p-1.5 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Marcar como Pago"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleCancelPending(t); }}
+                              className="p-1.5 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                              title="Remover Pendência"
+                            >
+                              <Ban size={14} />
+                            </button>
+                          </div>
                         )}
                       </td>
                    </tr>
