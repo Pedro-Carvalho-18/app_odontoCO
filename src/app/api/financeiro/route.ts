@@ -53,11 +53,15 @@ export async function GET(request: Request) {
     // Buscamos intervenções que não estão totalmente pagas
     const pendingInterventions = await db.all(`
       SELECT 
-        VALOR_PACIENTE as value,
-        ORCAMENTO as paidInst,
-        OBSERV as notes
-      FROM INTERVENCAO
-      WHERE STATUS != '3' -- Ignorar cancelados
+        I.VALOR_PACIENTE as value,
+        I.ORCAMENTO as paidInst,
+        I.OBSERV as notes,
+        I.NROINTPAC,
+        I.DATCAD as date,
+        TRIM(P.PRINOM || ' ' || COALESCE(P.SEGNOM, '')) as patientName
+      FROM INTERVENCAO I
+      LEFT JOIN PESSOAL P ON I.NROPAC = P.NROPAC
+      WHERE I.STATUS != '3' -- Ignorar cancelados
     `);
 
     const pendingTransactions: any[] = [];
@@ -66,6 +70,8 @@ export async function GET(request: Request) {
       // Tenta extrair o total de parcelas do OBSERV (X/Yx)
       let total = 1;
       const notes = inter.notes || "";
+      let procName = notes.split('|')[0].replace('PROCEDIMENTO:', '').trim() || 'Procedimento';
+      
       if (notes.includes('/')) {
         const match = notes.match(/\/(\d+)x\)/);
         if (match) total = parseInt(match[1]) || 1;
@@ -80,13 +86,13 @@ export async function GET(request: Request) {
         const valPerInst = (inter.value || 0) / total;
         const unpaidCount = total - paid;
         
-        // Adicionar detalhamento para o extrato pendente com ID global único
+        // Adicionar detalhamento para o extrato pendente com ID global único e descrição rica
         for (let i = paid + 1; i <= total; i++) {
            globalCounter++;
            pendingTransactions.push({
               id: `pending-item-${globalCounter}-${inter.NROINTPAC || 'no-id'}`,
               date: inter.date || new Date().toISOString(),
-              description: `A RECEBER: Parcela ${i}/${total} - ${inter.procedure || 'Procedimento'}`,
+              description: `A RECEBER: Parcela ${i}/${total} - ${inter.patientName} - ${procName}`,
               value: valPerInst,
               patientName: inter.patientName,
               type: 'pending'

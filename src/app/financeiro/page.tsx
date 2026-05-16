@@ -45,6 +45,7 @@ export default function FinanceiroPage() {
   // Filter State
   const [filterMode, setFilterMode] = useState<"all" | "income" | "expense" | "pending">("all");
   const [descriptionFilter, setDescriptionFilter] = useState("");
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
   const fetchFinance = useCallback(async () => {
     setLoading(true);
@@ -320,7 +321,11 @@ export default function FinanceiroPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                  {filteredTransactions.map((t: any, idx: number) => (
-                   <tr key={t.id || `row-${filterMode}-${idx}`} className="group hover:bg-slate-50/50 transition-colors">
+                   <tr 
+                    key={t.id || `row-${filterMode}-${idx}`} 
+                    onClick={() => setSelectedTransaction(t)}
+                    className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
+                   >
                       <td className="px-8 py-5">
                          <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">
                            {new Date(t.date).toLocaleDateString('pt-BR')}
@@ -490,6 +495,84 @@ export default function FinanceiroPage() {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+      {/* Details Modal */}
+      {selectedTransaction && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "p-2 rounded-xl text-white shadow-lg",
+                  selectedTransaction.type === 'income' ? "bg-emerald-500" : 
+                  selectedTransaction.type === 'expense' ? "bg-rose-500" : "bg-amber-500"
+                )}>
+                  {selectedTransaction.type === 'income' ? <ArrowUpCircle size={20} /> : 
+                   selectedTransaction.type === 'expense' ? <ArrowDownCircle size={20} /> : <TrendingUp size={20} />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase text-slate-900">Detalhes do Lançamento</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Informações completas do registro</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedTransaction(null)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição Completa</p>
+                <p className="text-lg font-bold text-slate-900 leading-tight">
+                  {selectedTransaction.description || "Sem descrição"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</p>
+                  <div className="flex items-center gap-2 text-slate-700 font-bold">
+                    <Calendar size={14} className="text-slate-400" />
+                    {new Date(selectedTransaction.date).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor do Registro</p>
+                  <p className={cn(
+                    "text-xl font-black",
+                    selectedTransaction.type === 'income' ? "text-emerald-600" : 
+                    selectedTransaction.type === 'expense' ? "text-rose-600" : "text-amber-500"
+                  )}>
+                    {selectedTransaction.type === 'income' ? "+" : selectedTransaction.type === 'expense' ? "-" : "≈"} 
+                    {formatCurrency(parseFloat(selectedTransaction.value))}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    {selectedTransaction.type === 'income' || selectedTransaction.type === 'pending' ? 'Paciente' : 'Profissional / Favorecido'}
+                  </p>
+                  <p className="text-sm font-bold text-slate-700 uppercase">
+                    {selectedTransaction.patientName || selectedTransaction.professionalName || "Clínica Geral"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Forma de Pagto</p>
+                  <div className="flex items-center gap-2 text-slate-700 font-bold uppercase text-xs">
+                    <CreditCard size={14} className="text-slate-400" />
+                    {selectedTransaction.paymentMethod || (selectedTransaction.type === 'pending' ? "Pendente" : "Não informado")}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50/50 border-t border-slate-100">
+              <button 
+                onClick={() => setSelectedTransaction(null)}
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+              >
+                Fechar Detalhes
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
