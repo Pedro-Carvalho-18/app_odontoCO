@@ -68,6 +68,7 @@ function PatientProfileContent() {
   const [history, setHistory] = useState<{ history: TreatmentItem[], interventions: TreatmentItem[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeFinanceSubTab, setActiveFinanceSubTab] = useState<"gestao" | "extrato">("gestao");
   const [selectedItem, setSelectedItem] = useState<TreatmentItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<TreatmentItem>>({});
@@ -816,196 +817,221 @@ function PatientProfileContent() {
                 </div>
               </div>
 
-              {/* Lista Detalhada de Orçamentos e Pagamentos */}
-              <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
-                {/* ... existing header and management table ... */}
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                    <CreditCard size={18} className="text-blue-600" />
-                    Gestão de Orçamentos e Pagamentos
-                  </h3>
-                  <button 
-                    onClick={loadData}
-                    className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400"
-                    title="Recarregar"
-                  >
-                    <Plus size={20} className="rotate-45" />
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {history?.interventions.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
-                            Nenhum registro financeiro encontrado
-                          </td>
+              {/* Navegação de Sub-abas Financeiras */}
+              <div className="flex items-center gap-4 border-b border-slate-200">
+                <button
+                  onClick={() => setActiveFinanceSubTab("gestao")}
+                  className={cn(
+                    "pb-3 text-[10px] font-black uppercase tracking-widest transition-all relative",
+                    activeFinanceSubTab === "gestao" ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Gestão de Orçamentos
+                  {activeFinanceSubTab === "gestao" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+                </button>
+                <button
+                  onClick={() => setActiveFinanceSubTab("extrato")}
+                  className={cn(
+                    "pb-3 text-[10px] font-black uppercase tracking-widest transition-all relative",
+                    activeFinanceSubTab === "extrato" ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Extrato de Pagamentos
+                  {activeFinanceSubTab === "extrato" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+                </button>
+              </div>
+
+              {activeFinanceSubTab === "gestao" ? (
+                /* Lista Detalhada de Orçamentos e Pagamentos */
+                <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                      <CreditCard size={18} className="text-blue-600" />
+                      Gestão de Orçamentos e Pagamentos
+                    </h3>
+                    <button 
+                      onClick={loadData}
+                      className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400"
+                      title="Recarregar"
+                    >
+                      <Plus size={20} className="rotate-45" />
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
                         </tr>
-                      ) : (
-                        history?.interventions.map((inter) => {
-                          const totalInst = Number(inter.totalInstallments || inter.installments || 1);
-                          const paidInst = Number(inter.paidInstallments || 0);
-                          const valPerInst = (inter.value || 0) / totalInst;
-                          
-                          return (
-                            <tr key={inter.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-6 py-4">
-                                <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center justify-center gap-2">
-                                  <input 
-                                    type="number"
-                                    min="0"
-                                    max={totalInst || 1}
-                                    className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    defaultValue={paidInst}
-                                    onBlur={async (e) => {
-                                      const newVal = parseInt(e.target.value);
-                                      if (newVal === paidInst) return;
-                                      
-                                      const newStatus = newVal >= totalInst ? "Concluído" : inter.status;
-                                      
-                                      setSaving(true);
-                                      try {
-                                        await fetch(`/api/pacientes/${id}/historico/atualizar`, {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ 
-                                            ...inter, 
-                                            paidInstallments: newVal, 
-                                            status: newStatus,
-                                            totalInstallments: totalInst
-                                          })
-                                        });
-                                        await loadData();
-                                      } catch (err) { console.error(err); } finally { setSaving(false); }
-                                    }}
-                                  />
-                                  <span className="text-[10px] font-black text-slate-400 uppercase">de {totalInst}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-xs font-black text-slate-900">R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                                  {["Em Aberto", "Concluído"].map(s => (
-                                    <button
-                                      key={s}
-                                      onClick={async () => {
-                                        if (inter.status === s) return;
-                                        const newPaidInst = s === "Concluído" ? totalInst : paidInst;
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {history?.interventions.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                              Nenhum registro financeiro encontrado
+                            </td>
+                          </tr>
+                        ) : (
+                          history?.interventions.map((inter) => {
+                            const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+                            const paidInst = Number(inter.paidInstallments || 0);
+                            const valPerInst = (inter.value || 0) / totalInst;
+                            
+                            return (
+                              <tr key={inter.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <input 
+                                      type="number"
+                                      min="0"
+                                      max={totalInst || 1}
+                                      className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      defaultValue={paidInst}
+                                      onBlur={async (e) => {
+                                        const newVal = parseInt(e.target.value);
+                                        if (newVal === paidInst) return;
+                                        
+                                        const newStatus = newVal >= totalInst ? "Concluído" : inter.status;
                                         
                                         setSaving(true);
                                         try {
                                           await fetch(`/api/pacientes/${id}/historico/atualizar`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ ...inter, status: s, paidInstallments: newPaidInst })
+                                            body: JSON.stringify({ 
+                                              ...inter, 
+                                              paidInstallments: newVal, 
+                                              status: newStatus,
+                                              totalInstallments: totalInst
+                                            })
                                           });
                                           await loadData();
                                         } catch (err) { console.error(err); } finally { setSaving(false); }
                                       }}
-                                      className={cn(
-                                        "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all",
-                                        inter.status === s 
-                                          ? (s === "Concluído" ? "bg-emerald-500 text-white shadow-sm" : "bg-amber-500 text-white shadow-sm")
-                                          : "text-slate-400 hover:text-slate-600"
-                                      )}
-                                    >
-                                      {s.split(' ')[0]}
-                                    </button>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Extrato de Parcelas Pagas */}
-              <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-emerald-50/30">
-                  <h3 className="font-bold text-emerald-900 flex items-center gap-2">
-                    <History size={18} className="text-emerald-600" />
-                    Extrato de Pagamentos Recebidos
-                  </h3>
-                  <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mt-1">Detalhamento individual de parcelas quitadas</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data do Lançamento</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição do Procedimento</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcela</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor da Parcela</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {history?.interventions.filter(i => (i.paidInstallments || 0) > 0).length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
-                            Nenhuma parcela paga registrada
-                          </td>
-                        </tr>
-                      ) : (
-                        history?.interventions.flatMap((inter) => {
-                          const totalInst = Number(inter.totalInstallments || inter.installments || 1);
-                          const paidInst = Number(inter.paidInstallments || 0);
-                          const valPerInst = (inter.value || 0) / totalInst;
-                          
-                          const rows = [];
-                          for (let i = 1; i <= paidInst; i++) {
-                            rows.push(
-                              <tr key={`${inter.id}-paid-${i}`} className="hover:bg-emerald-50/30 transition-colors">
-                                <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                                  {new Date(inter.date).toLocaleDateString('pt-BR')}
+                                    />
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">de {totalInst}</span>
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">{inter.professional}</p>
+                                  <p className="text-xs font-black text-slate-900">R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase">
-                                    Parcela {i}/{totalInst}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-xs font-black text-emerald-600">
-                                  R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2 text-emerald-600">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[9px] font-black uppercase">Recebido</span>
+                                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                                    {["Em Aberto", "Concluído"].map(s => (
+                                      <button
+                                        key={s}
+                                        onClick={async () => {
+                                          if (inter.status === s) return;
+                                          const newPaidInst = s === "Concluído" ? totalInst : paidInst;
+                                          
+                                          setSaving(true);
+                                          try {
+                                            await fetch(`/api/pacientes/${id}/historico/atualizar`, {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ ...inter, status: s, paidInstallments: newPaidInst })
+                                            });
+                                            await loadData();
+                                          } catch (err) { console.error(err); } finally { setSaving(false); }
+                                        }}
+                                        className={cn(
+                                          "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all",
+                                          inter.status === s 
+                                            ? (s === "Concluído" ? "bg-emerald-500 text-white shadow-sm" : "bg-amber-500 text-white shadow-sm")
+                                            : "text-slate-400 hover:text-slate-600"
+                                        )}
+                                      >
+                                        {s.split(' ')[0]}
+                                      </button>
+                                    ))}
                                   </div>
                                 </td>
                               </tr>
                             );
-                          }
-                          return rows;
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Extrato de Parcelas Pagas */
+                <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-2 duration-300">
+                  <div className="p-6 border-b border-slate-100 bg-emerald-50/30">
+                    <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+                      <History size={18} className="text-emerald-600" />
+                      Extrato de Pagamentos Recebidos
+                    </h3>
+                    <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mt-1">Detalhamento individual de parcelas quitadas</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data do Lançamento</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição do Procedimento</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcela</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor da Parcela</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {history?.interventions.filter(i => (i.paidInstallments || 0) > 0).length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                              Nenhuma parcela paga registrada
+                            </td>
+                          </tr>
+                        ) : (
+                          history?.interventions.flatMap((inter) => {
+                            const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+                            const paidInst = Number(inter.paidInstallments || 0);
+                            const valPerInst = (inter.value || 0) / totalInst;
+                            
+                            const rows = [];
+                            for (let i = 1; i <= paidInst; i++) {
+                              rows.push(
+                                <tr key={`${inter.id}-paid-${i}`} className="hover:bg-emerald-50/30 transition-colors">
+                                  <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                    {new Date(inter.date).toLocaleDateString('pt-BR')}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">{inter.professional}</p>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase">
+                                      Parcela {i}/{totalInst}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-black text-emerald-600">
+                                    R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-2 text-emerald-600">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      <span className="text-[9px] font-black uppercase">Recebido</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            return rows;
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
