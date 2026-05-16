@@ -15,6 +15,7 @@ export async function GET(
         H.REGISTRO as id,
         'history' as type,
         H.DATA as date,
+        H.DATA as createdAt,
         TRIM(H.DESCRICAO) as procedure,
         'Concluído' as status,
         COALESCE(TRIM(P.NOME), 'Profissional não identificado') as professional,
@@ -23,7 +24,7 @@ export async function GET(
       FROM HISTORICO H
       LEFT JOIN PRESTADOR P ON H.ID_PRESTADOR = P.ID_PRESTADOR
       WHERE H.NROPAC = ?
-      ORDER BY H.DATA DESC LIMIT 100`,
+      ORDER BY H.DATA DESC, CAST(H.REGISTRO AS INTEGER) DESC LIMIT 100`,
       [id]
     );
 
@@ -33,6 +34,7 @@ export async function GET(
         I.NROINTPAC as id,
         'intervention' as type,
         I.DATCAD as date,
+        I.TIME_STAMP_INS as createdAt,
         COALESCE(
           CASE 
             WHEN I.OBSERV LIKE '%|%' THEN TRIM(SUBSTR(I.OBSERV, 1, INSTR(I.OBSERV, '|') - 1))
@@ -93,7 +95,7 @@ export async function GET(
         ) GROUP BY NROPAC, NROINTPAC, NRODEN
       ) DF ON I.NROPAC = DF.NROPAC AND I.NROINTPAC = DF.NROINTPAC
       WHERE I.NROPAC = ?
-      ORDER BY I.DATCAD DESC`,
+      ORDER BY I.DATCAD DESC, I.TIME_STAMP_INS DESC, CAST(I.NROINTPAC AS INTEGER) DESC`,
       [id]
     );
 

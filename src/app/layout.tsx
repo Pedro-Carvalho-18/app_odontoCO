@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+"use client";
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
-import { Header } from "@/components/Header";
+import { useEffect } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,10 +15,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "OdontoOC - Gestão Odontológica",
-  description: "Sistema de gestão para clínicas odontológicas",
-};
+function SystemHealth() {
+  useEffect(() => {
+    // Ao iniciar o app, chama o health check para garantir migrações do banco
+    fetch("/api/health").catch(console.error);
+  }, []);
+  return null;
+}
 
 export default function RootLayout({
   children,
@@ -26,9 +30,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
+      <head>
+        <title>OdontOC - Gestão Odontológica</title>
+        <meta name="description" content="Sistema de gestão para clínicas odontológicas" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900`}
       >
+        <SystemHealth />
         <div className="flex min-h-screen">
           <Sidebar />
           <div className="flex-1 flex flex-col min-w-0">

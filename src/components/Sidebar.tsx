@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
@@ -12,7 +13,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
@@ -26,6 +27,37 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [profile, setProfile] = useState({ name: "Doutor(a)", cro: "---" });
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/configuracoes/perfil");
+        if (res.ok) {
+          const data = await res.json();
+          setProfile({
+            name: data.name || "Doutor(a)",
+            cro: data.cro || "---"
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load profile in sidebar:", err);
+      }
+    }
+    loadProfile();
+    
+    // Escuta por mudanças no perfil (opcional, para atualizar em tempo real ao salvar nas configs)
+    window.addEventListener('profile-updated', loadProfile);
+    return () => window.removeEventListener('profile-updated', loadProfile);
+  }, []);
+
+  const initials = profile.name
+    .split(' ')
+    .filter(n => n)
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <aside 
@@ -35,18 +67,54 @@ export function Sidebar() {
       )}
     >
       <div className="p-6 flex items-center justify-between">
-        {!isCollapsed && (
-          <span className="text-xl font-bold tracking-tight text-blue-400">
-            Odonto<span className="text-white">OC</span>
-          </span>
+        {!isCollapsed ? (
+          <div className="flex items-center gap-2">
+            <div className="rounded-md overflow-hidden bg-white/5">
+              <Image 
+                src="/AppIcone.png" 
+                alt="OdontOC Logo" 
+                width={32} 
+                height={32} 
+                className="object-contain scale-[1.1]"
+              />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-blue-400">
+              Odont<span className="text-white">OC</span>
+            </span>
+          </div>
+        ) : (
+          <div className="flex justify-center w-full">
+            <div className="rounded-md overflow-hidden bg-white/5">
+              <Image 
+                src="/AppIcone.png" 
+                alt="OdontOC Logo" 
+                width={28} 
+                height={28} 
+                className="object-contain scale-[1.1]"
+              />
+            </div>
+          </div>
         )}
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
-        >
-          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </button>
+        {!isCollapsed && (
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors ml-auto"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
       </div>
+
+      {isCollapsed && (
+        <div className="px-3 mb-4">
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-full flex justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
       <nav className="flex-1 px-3 space-y-1">
         {menuItems.map((item) => {
@@ -71,13 +139,17 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-slate-800">
         <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
-          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white shrink-0">
-            DR
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-black text-white shrink-0 uppercase tracking-tighter text-xs">
+            CC
           </div>
           {!isCollapsed && (
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">Usuário Logado</p>
-              <p className="text-xs text-slate-500 truncate">Cirurgião Dentista</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold leading-tight uppercase text-slate-100 line-clamp-2">
+                {profile.name}
+              </p>
+              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">
+                CRO: {profile.cro}
+              </p>
             </div>
           )}
         </div>

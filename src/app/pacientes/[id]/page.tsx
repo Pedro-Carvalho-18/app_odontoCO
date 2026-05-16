@@ -246,8 +246,9 @@ function PatientProfileContent() {
     );
   }
 
-  const allItems = [...(history?.interventions || []), ...(history?.history || [])].sort((a, b) => 
-    new Date(b.date).getTime() - new Date(a.date).getTime()
+  const allItems = [...(history?.interventions || []), ...(history?.history || [])]
+    .filter(item => !item.procedure?.includes("Alteração Odontograma"))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
   return (
@@ -605,9 +606,6 @@ function PatientProfileContent() {
               value={patientEditForm?.name || ""}
               onChange={(e) => setPatientEditForm({ ...patientEditForm, name: e.target.value })}
             />
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase mt-2">
-              Ativo
-            </span>
 
             <div className="w-full mt-8 space-y-4">
               <div className="flex items-center gap-3 text-left">
@@ -657,7 +655,10 @@ function PatientProfileContent() {
           <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Ações Rápidas</h3>
             <div className="grid grid-cols-2 gap-2">
-              <button className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all text-blue-600">
+              <button 
+                onClick={() => router.push(`/agenda?patientId=${id}`)}
+                className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all text-blue-600"
+              >
                 <Calendar size={18} />
                 <span className="text-[9px] font-black uppercase">Agendar</span>
               </button>
@@ -668,7 +669,10 @@ function PatientProfileContent() {
                 <FolderOpen size={18} />
                 <span className="text-[9px] font-black uppercase">Arquivos</span>
               </button>
-              <button className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-600 col-span-2">
+              <button 
+                onClick={() => router.push(`/?patientId=${id}&action=new_budget`)}
+                className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-600 col-span-2"
+              >
                 <CreditCard size={18} />
                 <span className="text-[9px] font-black uppercase">Orçamento</span>
               </button>

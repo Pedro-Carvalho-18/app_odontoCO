@@ -130,38 +130,61 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const db = await getDb();
-
-    // 1. Gerar novo REGISTRO (ID)
-    const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCCIRURGIAO");
-    const nextId = (Number(lastIdRow?.id) || 0) + 1;
-
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     const today = new Date().toISOString().split('T')[0];
 
-    // NROLAN: '9' para Despesa, '6' ou outro para Entrada (Ajuste conforme necessidade)
-    // No Easy Dental, Despesas costumam ser código 9
-    const nroLan = body.type === 'expense' ? '9' : '6';
+    // Se for entrada e tiver paciente, inserimos em CCPACIENTE
+    if (body.type === 'income' && body.patientId) {
+      const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+      const nextId = (Number(lastIdRow?.id) || 0) + 1;
 
-    await db.run(
-      `INSERT INTO CCCIRURGIAO (
-        REGISTRO, ID_PRESTADOR, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-        TRIBUTAVEL, TIPO_PAGTO, STATUS, TIME_STAMP_INS, DATA_LANCAMENTO, USER_STAMP_INS
-      ) VALUES (?, ?, ?, ?, ?, '255', ?, '0', ?, '2', ?, ?, ?)`,
-      [
-        nextId.toString(),
-        body.professionalId || "1",
-        body.date || today,
-        body.description,
-        nroLan,
-        body.value.toString(),
-        body.paymentMethodId || "1",
-        now,
-        today + " 00:00:00.000",
-        "SISTEMA"
-      ]
-    );
+      await db.run(
+        `INSERT INTO CCPACIENTE (
+          REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+          TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO
+        ) VALUES (?, ?, ?, ?, '6', '255', ?, ?, ?, ?, ?)`,
+        [
+          nextId.toString(),
+          body.patientId,
+          body.date || today,
+          body.description,
+          body.value.toString(),
+          body.paymentMethodId || "1",
+          "SISTEMA",
+          now,
+          today + " 00:00:00.000"
+        ]
+      );
 
-    return NextResponse.json({ success: true, id: nextId.toString() });
+      return NextResponse.json({ success: true, id: `p-${nextId}` });
+    } else {
+      // Caso contrário (despesa ou entrada sem paciente específico), inserimos em CCCIRURGIAO
+      const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCCIRURGIAO");
+      const nextId = (Number(lastIdRow?.id) || 0) + 1;
+
+      const nroLan = body.type === 'expense' ? '9' : '6';
+
+      await db.run(
+        `INSERT INTO CCCIRURGIAO (
+          REGISTRO, ID_PRESTADOR, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+          TRIBUTAVEL, TIPO_PAGTO, STATUS, TIME_STAMP_INS, DATA_LANCAMENTO, USER_STAMP_INS
+        ) VALUES (?, ?, ?, ?, ?, '255', ?, '0', ?, '2', ?, ?, ?)`,
+        [
+          nextId.toString(),
+          body.professionalId || "1",
+          body.date || today,
+          body.description,
+          nroLan,
+          body.value.toString(),
+          body.paymentMethodId || "1",
+          now,
+          today + " 00:00:00.000",
+          "SISTEMA"
+        ]
+      );
+
+      return NextResponse.json({ success: true, id: `c-${nextId}` });
+    }
   } catch (error: any) {
     console.error("API Error (Finance POST):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

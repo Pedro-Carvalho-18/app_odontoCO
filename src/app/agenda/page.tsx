@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -17,10 +17,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function AgendaPage() {
+function AgendaContent() {
   const router = useRouter();
-  const currentTimeRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -28,15 +30,6 @@ export default function AgendaPage() {
   const [selectedAppt, setSelectedAppt] = useState<any>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Auto-scroll logic
-  useEffect(() => {
-    if (!loading) {
-      setTimeout(() => {
-        currentTimeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 500);
-    }
-  }, [loading]);
 
   // Form State
   const [searchPatient, setSearchPatient] = useState("");
@@ -54,6 +47,27 @@ export default function AgendaPage() {
     type: "Consulta",
     notes: ""
   });
+
+  // Handle patient pre-selection from URL
+  useEffect(() => {
+    const patientId = searchParams.get('patientId');
+    if (patientId) {
+      const fetchPatient = async () => {
+        try {
+          const res = await fetch(`/api/pacientes/${patientId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setSelectedPatient(data);
+            setSearchPatient(data.name);
+            setShowNewModal(true);
+          }
+        } catch (err) {
+          console.error("Error pre-selecting patient:", err);
+        }
+      };
+      fetchPatient();
+    }
+  }, [searchParams]);
 
   // Calculate week dates (Monday to Saturday)
   const weekDays = useMemo(() => {
@@ -253,10 +267,45 @@ export default function AgendaPage() {
 
         <div className="flex items-center gap-3">
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button onClick={prevWeek} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronLeft size={18} /></button>
-            <button onClick={resetToday} className="px-4 py-2 text-[10px] font-black uppercase text-slate-600 hover:text-blue-600">Hoje</button>
-            <button onClick={nextWeek} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600"><ChevronRight size={18} /></button>
+            <button onClick={prevWeek} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600 border-r border-slate-200/50 rounded-r-none"><ChevronLeft size={18} /></button>
+            
+            <button 
+              onClick={() => {
+                if (dateInputRef.current) {
+                  try {
+                    // @ts-ignore
+                    dateInputRef.current.showPicker();
+                  } catch (e) {
+                    dateInputRef.current.click();
+                  }
+                }
+              }}
+              className="relative flex items-center group border-r border-slate-200/50 hover:bg-white transition-colors h-full"
+            >
+              <input 
+                ref={dateInputRef}
+                type="date" 
+                className="opacity-0 absolute inset-0 w-0 h-0 pointer-events-none"
+                value={currentDate.toISOString().split('T')[0]}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setCurrentDate(new Date(e.target.value + 'T12:00:00'));
+                  }
+                }}
+              />
+              <div className="flex items-center pl-9 pr-4 py-2 relative">
+                <div className="absolute left-3 text-slate-400 group-hover:text-blue-600 transition-colors">
+                  <CalendarIcon size={14} />
+                </div>
+                <span className="text-[10px] font-black uppercase text-slate-600 group-hover:text-blue-600 transition-colors">
+                  Calendário
+                </span>
+              </div>
+            </button>
+
+            <button onClick={nextWeek} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-600 rounded-l-none"><ChevronRight size={18} /></button>
           </div>
+          
           <button 
             onClick={() => setShowNewModal(true)}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
@@ -311,19 +360,16 @@ export default function AgendaPage() {
                 const currentM = now.getMinutes();
                 const [slotH, slotM] = time.split(':').map(Number);
                 
-                // Marcar como slot atual se estiver no intervalo de 30min
                 const isCurrentTimeSlot = currentH === slotH && (currentM >= slotM && currentM < slotM + 30);
 
                 return (
                   <div 
                     key={time} 
-                    ref={isCurrentTimeSlot ? currentTimeRef : null}
                     className={cn(
                       "flex border-b border-slate-50 last:border-0 min-h-[80px]",
                       isCurrentTimeSlot && "bg-blue-50/10"
                     )}
                   >
-                    {/* Time Label */}
                     <div className="w-20 shrink-0 flex flex-col items-end justify-start py-3 pr-4 border-r border-slate-100 bg-slate-50/30">
                       <span className={cn(
                         "text-[10px] font-black",
@@ -332,7 +378,6 @@ export default function AgendaPage() {
                       {isCurrentTimeSlot && <span className="text-[6px] font-black text-blue-500 uppercase tracking-tighter mt-1">Agora</span>}
                     </div>
 
-                    {/* Day Slots */}
                     {weekDays.map((day, dayIdx) => {
                       const dateStr = formatDateToSQL(day);
                       const appts = appointments.filter(a => {
@@ -412,9 +457,8 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* Modals (New/Edit) - Keeping existing logic but ensuring 'date' is updated */}
       {showNewModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                <div className="flex items-center gap-3">
@@ -428,7 +472,6 @@ export default function AgendaPage() {
             </div>
 
             <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
-               {/* Patient Selection */}
                <div className="space-y-2 relative">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paciente</label>
                   <div className="relative">
@@ -447,7 +490,7 @@ export default function AgendaPage() {
                     />
                   </div>
                   {isPatientSearchFocused && patientsList.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[210] overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[210] overflow-y-auto max-h-48 custom-scrollbar">
                       {patientsList.map(p => (
                         <button 
                           key={p.id} 
@@ -536,17 +579,8 @@ export default function AgendaPage() {
             </div>
 
             <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-4">
-               <button 
-                onClick={() => setShowNewModal(false)}
-                className="flex-1 py-4 bg-white text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all border border-slate-200"
-               >
-                 Cancelar
-               </button>
-               <button 
-                onClick={handleSave}
-                disabled={saving || (!selectedPatient && !searchPatient)}
-                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-               >
+               <button onClick={() => setShowNewModal(false)} className="flex-1 py-4 bg-white text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-200">Cancelar</button>
+               <button onClick={handleSave} disabled={saving || (!selectedPatient && !searchPatient)} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
                  {saving ? <Loader2 size={16} className="animate-spin" /> : "Agendar Consulta"}
                </button>
             </div>
@@ -555,7 +589,7 @@ export default function AgendaPage() {
       )}
 
       {showEditModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                <div className="flex items-center gap-3">
@@ -627,33 +661,17 @@ export default function AgendaPage() {
             <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-4">
                {showDeleteConfirm ? (
                  <div className="flex-1 flex gap-3 animate-in zoom-in-95 duration-200">
-                    <button 
-                      onClick={handleDelete}
-                      disabled={saving}
-                      className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg flex items-center justify-center gap-2"
-                    >
+                    <button onClick={handleDelete} disabled={saving} className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">
                       {saving ? <Loader2 size={16} className="animate-spin" /> : "Confirmar Exclusão"}
                     </button>
-                    <button 
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="flex-1 py-4 bg-white text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all border border-slate-200"
-                    >
-                      Cancelar
-                    </button>
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-4 bg-white text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-200">Cancelar</button>
                  </div>
                ) : (
                  <>
-                    <button 
-                      onClick={handleUpdate}
-                      disabled={saving}
-                      className="flex-[3] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
-                    >
+                    <button onClick={handleUpdate} disabled={saving} className="flex-[3] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">
                       {saving ? <Loader2 size={16} className="animate-spin" /> : "Salvar Alterações"}
                     </button>
-                    <button 
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex-1 py-4 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 flex items-center justify-center"
-                    >
+                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 py-4 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-rose-100 flex items-center justify-center">
                       <Trash2 size={18} />
                     </button>
                  </>
@@ -663,5 +681,13 @@ export default function AgendaPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AgendaPage() {
+  return (
+    <Suspense fallback={<div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>}>
+      <AgendaContent />
+    </Suspense>
   );
 }

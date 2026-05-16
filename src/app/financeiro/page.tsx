@@ -14,7 +14,8 @@ import {
   CreditCard,
   History,
   Plus,
-  X
+  X,
+  Download
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -33,13 +34,20 @@ export default function FinanceiroPage() {
 
   // Modal State
   const [showNewModal, setShowNewModal] = useState(false);
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
+  const [showPatientResults, setShowPatientResults] = useState(false);
+  
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     description: "",
     value: "",
     type: "expense", // income | expense
     professionalId: "1",
-    paymentMethodId: "4" // Dinheiro padrão
+    paymentMethodId: "4", // Dinheiro padrão
+    patientId: "" as string | null,
+    patientName: ""
   });
 
   // Filter State
@@ -59,6 +67,30 @@ export default function FinanceiroPage() {
       setLoading(false);
     }
   }, [startDate, endDate]);
+
+  const fetchPatients = async (query = "") => {
+    setLoadingPatients(true);
+    try {
+      const res = await fetch(`/api/pacientes?q=${query}&limit=5`);
+      const data = await res.json();
+      setPatients(data.patients || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingPatients(false);
+    }
+  };
+
+  useEffect(() => {
+    if (patientSearch.length >= 2) {
+      const delayDebounceFn = setTimeout(() => {
+        fetchPatients(patientSearch);
+      }, 300);
+      return () => clearTimeout(delayDebounceFn);
+    } else if (patientSearch.length === 0) {
+      setPatients([]);
+    }
+  }, [patientSearch]);
 
   useEffect(() => {
     fetchFinance();
@@ -97,8 +129,11 @@ export default function FinanceiroPage() {
           value: "",
           type: "expense",
           professionalId: "1",
-          paymentMethodId: "4"
+          paymentMethodId: "4",
+          patientId: null,
+          patientName: ""
         });
+        setPatientSearch("");
         fetchFinance();
       }
     } catch (err) {
@@ -127,6 +162,43 @@ export default function FinanceiroPage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleDownloadReport = () => {
+    if (!filteredTransactions || filteredTransactions.length === 0) {
+      alert("Nenhum dado para exportar.");
+      return;
+    }
+
+    // Header
+    const headers = ["Data", "Descricao", "Paciente/Profissional", "Tipo", "Forma Pagto", "Valor"];
+    
+    // Rows
+    const rows = filteredTransactions.map((t: any) => [
+      new Date(t.date).toLocaleDateString('pt-BR'),
+      t.description || "Pagamento",
+      t.patientName || t.professionalName || "Clinica",
+      t.type === 'income' ? "Entrada" : t.type === 'expense' ? "Saida" : "Pendente",
+      t.paymentMethod || "---",
+      parseFloat(t.value).toFixed(2).replace('.', ',')
+    ]);
+
+    // Construct CSV content
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map(e => e.join(";"))
+    ].join("\n");
+
+    // Create and trigger download
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_financeiro_${startDate}_a_${endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredTransactions = (() => {
@@ -176,6 +248,13 @@ export default function FinanceiroPage() {
               onChange={(e) => setEndDate(e.target.value)}
              />
           </div>
+          <button 
+            onClick={handleDownloadReport}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+          >
+            <Download size={16} />
+            Baixar Relatório
+          </button>
           <button 
             onClick={() => setShowNewModal(true)}
             className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
@@ -417,6 +496,63 @@ export default function FinanceiroPage() {
                       <ArrowUpCircle size={14} className="inline mr-2" /> Entrada
                     </button>
                  </div>
+
+                 {formData.type === 'income' && (
+                    <div className="space-y-2 relative">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paciente (Opcional)</label>
+                       <div className="relative">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                          <input 
+                            type="text" 
+                            placeholder="Buscar paciente por nome..."
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:bg-white transition-all"
+                            value={formData.patientName || patientSearch}
+                            onChange={e => {
+                               setPatientSearch(e.target.value);
+                               setFormData({...formData, patientName: e.target.value, patientId: null});
+                               setShowPatientResults(true);
+                            }}
+                            onFocus={() => setShowPatientResults(true)}
+                          />
+                          {formData.patientId && (
+                             <button 
+                                onClick={() => {
+                                   setFormData({...formData, patientId: null, patientName: ""});
+                                   setPatientSearch("");
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700"
+                             >
+                                <X size={16} />
+                             </button>
+                          )}
+                       </div>
+
+                       {showPatientResults && patients.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 z-[210] mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-2">
+                             {patients.map(p => (
+                                <button 
+                                   key={p.id}
+                                   onClick={() => {
+                                      setFormData({...formData, patientId: p.id, patientName: p.name});
+                                      setPatientSearch(p.name);
+                                      setShowPatientResults(false);
+                                   }}
+                                   className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"
+                                >
+                                   <p className="text-xs font-black uppercase text-slate-700">{p.name}</p>
+                                   <p className="text-[9px] font-bold text-slate-400">{p.cpf || "Sem CPF"}</p>
+                                </button>
+                             ))}
+                          </div>
+                       )}
+                       
+                       {loadingPatients && (
+                          <div className="absolute top-full left-0 right-0 z-[210] mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 flex justify-center">
+                             <Loader2 size={16} className="animate-spin text-blue-600" />
+                          </div>
+                       )}
+                    </div>
+                 )}
 
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

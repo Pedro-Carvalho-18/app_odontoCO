@@ -6,6 +6,7 @@ import {
   Filter, 
   MoreHorizontal, 
   UserPlus,
+  Users,
   Mail,
   Phone,
   X,
@@ -182,74 +183,71 @@ export default function PatientsPage() {
   };
 
   return (
-    <div className="space-y-6 relative h-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Pacientes</h1>
-          <p className="text-slate-500">Gerencie o cadastro e histórico dos seus pacientes reais.</p>
+    <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-4 overflow-hidden">
+      {/* Header Modernizado */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-100">
+            <Users size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">Pacientes</h1>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Gerencie sua base de clientes</p>
+          </div>
         </div>
-        <button 
-          onClick={() => setShowNewModal(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-        >
-          <UserPlus size={18} />
-          Novo Paciente
-        </button>
-      </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <div className="flex items-center gap-3">
+          <div className="relative group flex-1 md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
               type="text" 
-              placeholder="Buscar por nome, CPF ou e-mail..." 
+              placeholder="Pesquisar por nome ou CPF..." 
+              className="w-full pl-12 pr-4 py-3 bg-slate-100 border border-transparent rounded-2xl text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
             />
           </div>
-          <div className="flex items-center gap-2">
-            {(loading || loadingMore) && <Loader2 size={18} className="animate-spin text-blue-600" />}
-            <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-              <Filter size={16} />
-              Filtros
-            </button>
-          </div>
+          <button 
+            onClick={() => setShowNewModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95 whitespace-nowrap"
+          >
+            <UserPlus size={16} />
+            Novo Paciente
+          </button>
         </div>
+      </div>
 
+      <div className="flex-1 bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div 
-          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] custom-scrollbar"
+          className="flex-1 overflow-auto custom-scrollbar"
           onScroll={handleScroll}
         >
           <table className="w-full text-left">
-            <thead className="sticky top-0 bg-white z-10">
-              <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+            <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
+              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="px-6 py-4 font-semibold">Paciente</th>
                 <th className="px-6 py-4 font-semibold">Contato</th>
                 <th className="px-6 py-4 font-semibold">CPF</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-50">
               {loading && patients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                     <Loader2 size={32} className="animate-spin mx-auto mb-2 opacity-20" />
                     Carregando pacientes...
                   </td>
                 </tr>
               ) : patients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                     Nenhum paciente encontrado.
                   </td>
                 </tr>
               ) : (
                 <>
                   {patients.map((patient) => {
-                    const statusInfo = formatStatus(patient.status);
                     return (
                       <tr 
                         key={patient.id} 
@@ -279,11 +277,6 @@ export default function PatientsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-600">{patient.cpf || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", statusInfo.class)}>
-                            {statusInfo.label}
-                          </span>
-                        </td>
                         <td className="px-6 py-4 text-right">
                           <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                             <MoreHorizontal size={18} />
@@ -294,7 +287,7 @@ export default function PatientsPage() {
                   })}
                   {loadingMore && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
                         <Loader2 size={24} className="animate-spin mx-auto" />
                       </td>
                     </tr>

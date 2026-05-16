@@ -113,6 +113,33 @@ export default function PatientRecordPage() {
     }
   }, [selectedPatient]);
 
+  // Handle patient selection and action from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const patientId = params.get('patientId');
+    const action = params.get('action');
+
+    if (patientId) {
+      const fetchPatient = async () => {
+        try {
+          const res = await fetch(`/api/pacientes/${patientId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const patientObj = { id: data.id, name: data.name, phone: data.phone, email: data.email };
+            setSelectedPatient(patientObj);
+            
+            if (action === 'new_budget') {
+              setShowLaunchModal(true);
+            }
+          }
+        } catch (err) {
+          console.error("Error selecting patient from URL:", err);
+        }
+      };
+      fetchPatient();
+    }
+  }, []);
+
   const [catalogData, setCatalogData] = useState<{
     specialties: any[];
     procedures: any[];
@@ -191,6 +218,8 @@ export default function PatientRecordPage() {
 
   const [patientOdontograms, setPatientOdontograms] = useState<Record<string, Record<number, { status: ToothStatus; surfaces: any }>>>({});
   const [modifiedTeeth, setModifiedTeeth] = useState<Record<string, number[]>>({});
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -217,9 +246,10 @@ export default function PatientRecordPage() {
       ].map((item: any) => {
         // Clean the date string: replace '.' with ' ' if it's in the format YYYY-MM-DD.000
         const cleanDate = item.date ? item.date.replace('.000', '') : new Date().toISOString();
+        const createdAt = item.createdAt ? item.createdAt.replace('.000', '').replace(' ', 'T') : null;
         return {
           ...item,
-          fullDate: cleanDate,
+          fullDate: createdAt || cleanDate.replace(' ', 'T'),
           date: cleanDate.split(' ')[0],
           tooth: item.tooth && item.tooth !== "null" ? item.tooth : "N/A"
         };
@@ -328,9 +358,9 @@ export default function PatientRecordPage() {
     if (selectedPatient) fetchHistory(selectedPatient.id);
   }, [selectedPatient, fetchHistory]);
 
-  const handleSaveAll = async () => {
+  const handleSaveAll = async (silent = false) => {
     if (!selectedPatient) {
-      alert("Erro: Nenhum paciente selecionado para salvar.");
+      if (!silent) alert("Erro: Nenhum paciente selecionado para salvar.");
       return;
     }
     const pId = String(selectedPatient.id);
@@ -366,11 +396,12 @@ export default function PatientRecordPage() {
     const allToSave = [...updatedInterventions, ...manualMods];
     
     if (allToSave.length === 0) {
-      alert(`Nenhuma alteração detectada.\n- Novas intervenções pendentes: ${newInterventions.length}\n- Dentes modificados: ${patientMods.length} (${patientMods.join(', ')})\n- ID do Paciente: ${pId}`);
+      if (!silent) alert(`Nenhuma alteração detectada.\n- Novas intervenções pendentes: ${newInterventions.length}\n- Dentes modificados: ${patientMods.length} (${patientMods.join(', ')})\n- ID do Paciente: ${pId}`);
       return;
     }
 
-    setLoadingHistory(true);
+    if (!silent) setLoadingHistory(true);
+    setIsAutoSaving(true);
     try {
       console.log(`[FRONTEND] Sending ${allToSave.length} items to save for patient ${pId}`);
       const res = await fetch(`/api/pacientes/${pId}/salvar`, { 
@@ -382,18 +413,40 @@ export default function PatientRecordPage() {
       if (res.ok) {
         setModifiedTeeth(prev => ({ ...prev, [pId]: [] }));
         await fetchHistory(pId);
-        alert("Alterações salvas com sucesso!");
+        if (!silent) alert("Alterações salvas com sucesso!");
       } else {
         const errData = await res.json();
-        alert(`Erro ao salvar no servidor: ${errData.error || 'Erro desconhecido'}`);
+        if (!silent) alert(`Erro ao salvar no servidor: ${errData.error || 'Erro desconhecido'}`);
       }
     } catch (err) { 
       console.error(err); 
-      alert("Erro crítico: Falha ao conectar com a API de salvamento.");
+      if (!silent) alert("Erro crítico: Falha ao conectar com a API de salvamento.");
     } finally { 
-      setLoadingHistory(false); 
+      if (!silent) setLoadingHistory(false); 
+      setIsAutoSaving(false);
     }
   };
+
+  // Auto-save logic
+  useEffect(() => {
+    if (!selectedPatient || !initialLoadDone) return;
+    
+    const pId = String(selectedPatient.id);
+    const hasUnsavedInterventions = history.some(h => typeof h.id === 'number');
+    const hasModifiedTeeth = (modifiedTeeth[pId]?.length || 0) > 0;
+
+    if (hasUnsavedInterventions || hasModifiedTeeth) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      
+      saveTimeoutRef.current = setTimeout(() => {
+        handleSaveAll(true);
+      }, 1500);
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [patientOdontograms, history, selectedPatient, initialLoadDone]);
 
   const updateTooth = (number: number, status: ToothStatus, surfaces: any) => {
     if (!selectedPatient) return;
@@ -530,7 +583,20 @@ export default function PatientRecordPage() {
             </>
           )}
           <button onClick={() => setShowLaunchModal(true)} className="px-4 py-2 flex items-center gap-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-black text-[10px] uppercase"><Plus size={16} /> Novo Lançamento</button>
-          <button onClick={handleSaveAll} className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase">Salvar</button>
+          
+          <div className="h-4 w-px bg-slate-200 mx-1" />
+
+          {isAutoSaving ? (
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-lg animate-pulse">
+              <Loader2 size={12} className="animate-spin" />
+              <span className="text-[10px] font-black uppercase">Sincronizando...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 text-slate-400">
+              <CheckCircle2 size={12} className="text-emerald-500" />
+              <span className="text-[10px] font-black uppercase">Sincronizado</span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -573,7 +639,7 @@ export default function PatientRecordPage() {
               <button onClick={() => scrollHistory('left')} className="absolute left-2 z-10 p-2 bg-white/80 shadow-lg rounded-full hover:bg-white transition-all"><ChevronLeft size={20} /></button>
               <button onClick={() => scrollHistory('right')} className="absolute right-2 z-10 p-2 bg-white/80 shadow-lg rounded-full hover:bg-white transition-all"><ChevronRight size={20} /></button>
               <div ref={scrollContainerRef} className="flex-1 overflow-x-auto p-5 flex gap-4 scroll-smooth hide-scrollbar px-10">
-                 {history.map((item, idx) => (
+                 {history.filter(h => !h.procedure.includes("Alteração Odontograma")).map((item, idx) => (
                    <div key={idx} onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} className="w-60 shrink-0 p-4 rounded-3xl border border-slate-100 bg-white flex flex-col gap-2 hover:shadow-xl transition-all cursor-pointer">
                       <div className="flex justify-between items-start">
                          <span className="text-[8px] font-black text-slate-400 uppercase">
