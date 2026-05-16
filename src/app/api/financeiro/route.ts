@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     // 1. Receitas de Pacientes (CCPACIENTE)
     const patientIncome = await db.all(
       `SELECT 
-        C.REGISTRO as id,
+        'p-' || C.REGISTRO as id,
         C.DATA as date,
         C.HISTORICO as description,
         C.VALOR as value,
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     // 2. Movimentações do Cirurgião (CCCIRURGIAO)
     const surgeonMoves = await db.all(
       `SELECT 
-        C.REGISTRO as id,
+        'c-' || C.REGISTRO as id,
         C.DATA as date,
         C.HISTORICO as description,
         C.VALOR as value,
@@ -49,7 +49,56 @@ export async function GET(request: Request) {
       [start, end]
     );
 
-    // 3. Totais e Resumo
+    // 3. Saldo Pendente (Total que falta receber de todos os pacientes)
+    // Buscamos intervenções que não estão totalmente pagas
+    const pendingInterventions = await db.all(`
+      SELECT 
+        VALOR_PACIENTE as value,
+        ORCAMENTO as paidInst,
+        OBSERV as notes
+      FROM INTERVENCAO
+      WHERE STATUS != '3' -- Ignorar cancelados
+    `);
+
+    const pendingTransactions: any[] = [];
+    let globalCounter = 0;
+    const totalPending = pendingInterventions.reduce((sum, inter) => {
+      // Tenta extrair o total de parcelas do OBSERV (X/Yx)
+      let total = 1;
+      const notes = inter.notes || "";
+      if (notes.includes('/')) {
+        const match = notes.match(/\/(\d+)x\)/);
+        if (match) total = parseInt(match[1]) || 1;
+      } else if (notes.includes('(')) {
+        const match = notes.match(/\((\d+)x\)/);
+        if (match) total = parseInt(match[1]) || 1;
+      }
+
+      const paid = parseInt(inter.paidInst || '0') || 0;
+      
+      if (paid < total) {
+        const valPerInst = (inter.value || 0) / total;
+        const unpaidCount = total - paid;
+        
+        // Adicionar detalhamento para o extrato pendente com ID global único
+        for (let i = paid + 1; i <= total; i++) {
+           globalCounter++;
+           pendingTransactions.push({
+              id: `pending-item-${globalCounter}-${inter.NROINTPAC || 'no-id'}`,
+              date: inter.date || new Date().toISOString(),
+              description: `A RECEBER: Parcela ${i}/${total} - ${inter.procedure || 'Procedimento'}`,
+              value: valPerInst,
+              patientName: inter.patientName,
+              type: 'pending'
+           });
+        }
+
+        return sum + (valPerInst * unpaidCount);
+      }
+      return sum;
+    }, 0);
+
+    // 4. Totais e Resumo
     const allTransactions = [...patientIncome, ...surgeonMoves].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     const totalIncome = allTransactions.reduce((sum, item) => item.type === 'income' ? sum + parseFloat(item.value || 0) : sum, 0);
@@ -57,10 +106,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       transactions: allTransactions,
+      pendingTransactions,
       summary: {
         income: totalIncome,
         expenses: totalExpense,
-        balance: totalIncome - totalExpense
+        balance: totalIncome - totalExpense,
+        pending: totalPending
       }
     });
   } catch (error: any) {
@@ -107,6 +158,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id: nextId.toString() });
   } catch (error: any) {
     console.error("API Error (Finance POST):", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id"); // e.g. "p-1" or "c-1"
+
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
+
+    const db = await getDb();
+    
+    if (id.startsWith('p-')) {
+      await db.run("DELETE FROM CCPACIENTE WHERE REGISTRO = ?", [id.replace('p-', '')]);
+    } else if (id.startsWith('c-')) {
+      await db.run("DELETE FROM CCCIRURGIAO WHERE REGISTRO = ?", [id.replace('c-', '')]);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("API Error (Finance DELETE):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

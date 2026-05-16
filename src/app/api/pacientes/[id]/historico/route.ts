@@ -55,8 +55,22 @@ export async function GET(
         CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT) as value,
         TRIM(COALESCE(I.S_DENTES, '')) as tooth,
         I.OBSERV as notes,
-        0 as paidInstallments,
         CASE 
+          WHEN I.ORCAMENTO IS NOT NULL AND I.ORCAMENTO != '' THEN CAST(I.ORCAMENTO AS INTEGER)
+          WHEN I.STATUS = '2' THEN 
+            CASE 
+              WHEN I.OBSERV LIKE '%(%/%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, '/') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              WHEN I.OBSERV LIKE '%(%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              ELSE 1
+            END
+          ELSE 
+            CASE 
+              WHEN I.OBSERV LIKE '%(%/%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, '/') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              ELSE 0
+            END
+        END as paidInstallments,
+        CASE 
+          WHEN I.OBSERV LIKE '%(%/%x)%' THEN TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '/') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '/') - 1))
           WHEN I.OBSERV LIKE '%(%x)%' THEN TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '(') - 1))
           ELSE '1'
         END as installments,

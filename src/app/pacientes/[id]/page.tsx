@@ -92,8 +92,25 @@ function PatientProfileContent() {
       ]);
       const pData = await pRes.json();
       const hData = await hRes.json();
-      setPatient(pData);
-      setPatientEditForm(pData);
+      
+      const defaultAnamnesis = [
+        { id: "2", question: "Alergia a medicamentos? Quais?", alert: null, complement: "" },
+        { id: "1", question: "Usa Medicamentos? Quais?", alert: null, complement: "" },
+        { id: "3", question: "Pressão alta?", alert: null, complement: "" },
+        { id: "11", question: "Tem asma?", alert: null, complement: "" },
+        { id: "13", question: "Reação com anestésicos?", alert: null, complement: "" },
+        { id: "6", question: "Bruxismo (ranger dentes)?", alert: null, complement: "" },
+        { id: "17", question: "Está grávida?", alert: null, complement: "" },
+        { id: "8", question: "Tem sinusite?", alert: null, complement: "" }
+      ];
+
+      const patientWithAnamnesis = {
+        ...pData,
+        anamnesis: (pData.anamnesis && pData.anamnesis.length > 0) ? pData.anamnesis : defaultAnamnesis
+      };
+
+      setPatient(patientWithAnamnesis);
+      setPatientEditForm(patientWithAnamnesis);
       setHistory(hData);
     } catch (err) {
       console.error(err);
@@ -144,6 +161,8 @@ function PatientProfileContent() {
     setIsEditingPatient(true);
   };
 
+  const hasChanges = JSON.stringify(patient) !== JSON.stringify(patientEditForm);
+
   const handleSavePatient = async () => {
     setSaving(true);
     try {
@@ -153,8 +172,12 @@ function PatientProfileContent() {
         body: JSON.stringify(patientEditForm)
       });
       if (res.ok) {
+        const updatedData = await res.json();
+        setPatient(updatedData);
+        setPatientEditForm(updatedData);
+        // We don't need to call loadData() here if the API returns the updated patient
+        // but loadData also loads history, so let's keep it simple
         await loadData();
-        setIsEditingPatient(false);
       }
     } catch (err) {
       console.error(err);
@@ -564,7 +587,7 @@ function PatientProfileContent() {
           <ChevronLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{patient?.name}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{patientEditForm?.name}</h1>
           <p className="text-sm text-slate-500">Prontuário Digital #{id}</p>
         </div>
       </div>
@@ -574,9 +597,14 @@ function PatientProfileContent() {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-blue-600 rounded-[28px] flex items-center justify-center text-white text-3xl font-black mb-4 shadow-xl shadow-blue-100">
-              {patient?.name?.[0]}
+              {patientEditForm?.name?.[0]}
             </div>
-            <h2 className="font-bold text-slate-900">{patient?.name}</h2>
+            <textarea 
+              rows={2}
+              className="font-bold text-slate-900 text-center bg-transparent border-none focus:ring-0 w-full resize-none h-auto py-0 leading-tight"
+              value={patientEditForm?.name || ""}
+              onChange={(e) => setPatientEditForm({ ...patientEditForm, name: e.target.value })}
+            />
             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase mt-2">
               Ativo
             </span>
@@ -588,7 +616,12 @@ function PatientProfileContent() {
                 </div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase">Telefone</p>
-                  <p className="text-xs font-bold text-slate-700">{patient?.phone || "Não informado"}</p>
+                  <input 
+                    type="text"
+                    className="text-xs font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 w-full"
+                    value={patientEditForm?.phone || ""}
+                    onChange={(e) => setPatientEditForm({ ...patientEditForm, phone: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-3 text-left">
@@ -597,16 +630,27 @@ function PatientProfileContent() {
                 </div>
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase">E-mail</p>
-                  <p className="text-xs font-bold text-slate-700 truncate max-w-[150px]">{patient?.email || "Não informado"}</p>
+                  <input 
+                    type="text"
+                    className="text-xs font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 w-full truncate"
+                    value={patientEditForm?.email || ""}
+                    onChange={(e) => setPatientEditForm({ ...patientEditForm, email: e.target.value })}
+                  />
                 </div>
               </div>
             </div>
 
             <button 
-              onClick={handleEditPatient}
-              className="w-full mt-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+              disabled={!hasChanges || saving}
+              onClick={handleSavePatient}
+              className={cn(
+                "w-full mt-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2",
+                hasChanges 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+              )}
             >
-              Editar Cadastro
+              {saving ? <Loader2 size={14} className="animate-spin" /> : "Salvar Alterações"}
             </button>
           </div>
 
@@ -706,12 +750,7 @@ function PatientProfileContent() {
                             </div>
                           </div>
                           <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {(() => {
-                              if (!item.notes) return item.procedure;
-                              const parts = item.notes.split('|');
-                              // Assuming index 0 or similar is the descriptive part, excluding timing/payment metadata
-                              return parts[parts.length - 1].trim();
-                            })()}
+                            {item.procedure}
                           </h4>
                           <div className="flex items-center gap-4 mt-1">
                             <p className="text-[10px] font-bold text-slate-500">Valor: R$ {item.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
@@ -735,6 +774,237 @@ function PatientProfileContent() {
             </div>
           )}
 
+          {/* Tab Content: Financeiro */}
+          {activeTab === "financeiro" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Resumo Financeiro */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total em Tratamentos</p>
+                  <h4 className="text-2xl font-black text-slate-900">
+                    R$ {history?.interventions.reduce((acc, curr) => acc + (curr.value || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </h4>
+                </div>
+                <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pago</p>
+                  <h4 className="text-2xl font-black text-emerald-600">
+                    R$ {history?.interventions.reduce((acc, curr) => {
+                      const totalInst = Number(curr.totalInstallments || curr.installments || 1);
+                      const paidInst = Number(curr.paidInstallments || 0);
+                      const valPerInst = (curr.value || 0) / totalInst;
+                      return acc + (valPerInst * paidInst);
+                    }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </h4>
+                </div>
+                <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Devedor</p>
+                  <h4 className="text-2xl font-black text-rose-600">
+                    R$ {(
+                      history?.interventions.reduce((acc, curr) => acc + (curr.value || 0), 0) -
+                      history?.interventions.reduce((acc, curr) => {
+                        const totalInst = Number(curr.totalInstallments || curr.installments || 1);
+                        const paidInst = Number(curr.paidInstallments || 0);
+                        const valPerInst = (curr.value || 0) / totalInst;
+                        return acc + (valPerInst * paidInst);
+                      }, 0)
+                    ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Lista Detalhada de Orçamentos e Pagamentos */}
+              <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                {/* ... existing header and management table ... */}
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <CreditCard size={18} className="text-blue-600" />
+                    Gestão de Orçamentos e Pagamentos
+                  </h3>
+                  <button 
+                    onClick={loadData}
+                    className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400"
+                    title="Recarregar"
+                  >
+                    <Plus size={20} className="rotate-45" />
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {history?.interventions.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                            Nenhum registro financeiro encontrado
+                          </td>
+                        </tr>
+                      ) : (
+                        history?.interventions.map((inter) => {
+                          const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+                          const paidInst = Number(inter.paidInstallments || 0);
+                          const valPerInst = (inter.value || 0) / totalInst;
+                          
+                          return (
+                            <tr key={inter.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  <input 
+                                    type="number"
+                                    min="0"
+                                    max={totalInst || 1}
+                                    className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    defaultValue={paidInst}
+                                    onBlur={async (e) => {
+                                      const newVal = parseInt(e.target.value);
+                                      if (newVal === paidInst) return;
+                                      
+                                      const newStatus = newVal >= totalInst ? "Concluído" : inter.status;
+                                      
+                                      setSaving(true);
+                                      try {
+                                        await fetch(`/api/pacientes/${id}/historico/atualizar`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ 
+                                            ...inter, 
+                                            paidInstallments: newVal, 
+                                            status: newStatus,
+                                            totalInstallments: totalInst
+                                          })
+                                        });
+                                        await loadData();
+                                      } catch (err) { console.error(err); } finally { setSaving(false); }
+                                    }}
+                                  />
+                                  <span className="text-[10px] font-black text-slate-400 uppercase">de {totalInst}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className="text-xs font-black text-slate-900">R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                                  {["Em Aberto", "Concluído"].map(s => (
+                                    <button
+                                      key={s}
+                                      onClick={async () => {
+                                        if (inter.status === s) return;
+                                        const newPaidInst = s === "Concluído" ? totalInst : paidInst;
+                                        
+                                        setSaving(true);
+                                        try {
+                                          await fetch(`/api/pacientes/${id}/historico/atualizar`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ ...inter, status: s, paidInstallments: newPaidInst })
+                                          });
+                                          await loadData();
+                                        } catch (err) { console.error(err); } finally { setSaving(false); }
+                                      }}
+                                      className={cn(
+                                        "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all",
+                                        inter.status === s 
+                                          ? (s === "Concluído" ? "bg-emerald-500 text-white shadow-sm" : "bg-amber-500 text-white shadow-sm")
+                                          : "text-slate-400 hover:text-slate-600"
+                                      )}
+                                    >
+                                      {s.split(' ')[0]}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Extrato de Parcelas Pagas */}
+              <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-emerald-50/30">
+                  <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+                    <History size={18} className="text-emerald-600" />
+                    Extrato de Pagamentos Recebidos
+                  </h3>
+                  <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mt-1">Detalhamento individual de parcelas quitadas</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data do Lançamento</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição do Procedimento</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcela</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor da Parcela</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {history?.interventions.filter(i => (i.paidInstallments || 0) > 0).length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                            Nenhuma parcela paga registrada
+                          </td>
+                        </tr>
+                      ) : (
+                        history?.interventions.flatMap((inter) => {
+                          const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+                          const paidInst = Number(inter.paidInstallments || 0);
+                          const valPerInst = (inter.value || 0) / totalInst;
+                          
+                          const rows = [];
+                          for (let i = 1; i <= paidInst; i++) {
+                            rows.push(
+                              <tr key={`${inter.id}-paid-${i}`} className="hover:bg-emerald-50/30 transition-colors">
+                                <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                  {new Date(inter.date).toLocaleDateString('pt-BR')}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">{inter.professional}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase">
+                                    Parcela {i}/{totalInst}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-black text-emerald-600">
+                                  R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2 text-emerald-600">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[9px] font-black uppercase">Recebido</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return rows;
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tab Content: Dados Pessoais */}
           {activeTab === "dados" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -742,29 +1012,85 @@ function PatientProfileContent() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CPF</p>
-                    <p className="text-sm font-bold text-slate-700">{patient?.cpf || "---"}</p>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                      value={patientEditForm?.cpf || ""}
+                      onChange={(e) => setPatientEditForm({ ...patientEditForm, cpf: maskCPF(e.target.value) })}
+                    />
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">RG</p>
-                    <p className="text-sm font-bold text-slate-700">{patient?.rg || "---"}</p>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                      value={patientEditForm?.rg || ""}
+                      onChange={(e) => setPatientEditForm({ ...patientEditForm, rg: maskRG(e.target.value) })}
+                    />
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nascimento</p>
-                    <p className="text-sm font-bold text-slate-700">{patient?.birthDate ? new Date(patient.birthDate).toLocaleDateString('pt-BR') : "---"}</p>
+                    <input 
+                      type="date"
+                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                      value={patientEditForm?.birthDate ? new Date(patientEditForm.birthDate).toISOString().split('T')[0] : ""}
+                      onChange={(e) => setPatientEditForm({ ...patientEditForm, birthDate: e.target.value })}
+                    />
                   </div>
                   <div className="col-span-full">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Endereço Residencial</p>
-                    <div className="flex items-start gap-2">
-                      <MapPin size={16} className="text-blue-500 mt-0.5" />
-                      <p className="text-sm font-bold text-slate-700">
-                        {patient?.address || "---"}, {patient?.neighborhood}<br />
-                        {patient?.city} - {patient?.state} | {patient?.zipCode}
-                      </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 bg-slate-50/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all">
+                        <MapPin size={16} className="text-blue-500" />
+                        <input 
+                          type="text"
+                          placeholder="Rua, Número, Complemento"
+                          className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-slate-700 focus:ring-0"
+                          value={patientEditForm?.address || ""}
+                          onChange={(e) => setPatientEditForm({ ...patientEditForm, address: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Bairro"
+                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                          value={patientEditForm?.neighborhood || ""}
+                          onChange={(e) => setPatientEditForm({ ...patientEditForm, neighborhood: e.target.value })}
+                        />
+                        <input 
+                          type="text"
+                          placeholder="Cidade"
+                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                          value={patientEditForm?.city || ""}
+                          onChange={(e) => setPatientEditForm({ ...patientEditForm, city: e.target.value })}
+                        />
+                        <input 
+                          type="text"
+                          placeholder="UF"
+                          maxLength={2}
+                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                          value={patientEditForm?.state || ""}
+                          onChange={(e) => setPatientEditForm({ ...patientEditForm, state: e.target.value })}
+                        />
+                        <input 
+                          type="text"
+                          placeholder="CEP"
+                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                          value={patientEditForm?.zipCode || ""}
+                          onChange={(e) => setPatientEditForm({ ...patientEditForm, zipCode: e.target.value })}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Profissão</p>
-                    <p className="text-sm font-bold text-slate-700">{patient?.profession || "---"}</p>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                      value={patientEditForm?.profession || ""}
+                      onChange={(e) => setPatientEditForm({ ...patientEditForm, profession: e.target.value })}
+                    />
                   </div>
                 </div>
               </div>
@@ -781,10 +1107,10 @@ function PatientProfileContent() {
                   </div>
                 </div>
                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(patient?.anamnesis && patient.anamnesis.length > 0) ? (
-                    patient.anamnesis.map((item: any, idx: number) => (
+                  {patientEditForm?.anamnesis?.length > 0 ? (
+                    patientEditForm.anamnesis.map((item: any, idx: number) => (
                       <div key={idx} className={cn(
-                        "p-4 rounded-2xl border flex gap-4 transition-all",
+                        "p-4 rounded-2xl border flex gap-4 transition-all focus-within:border-blue-500 focus-within:bg-white",
                         item.responseId === '2' ? "bg-rose-50/30 border-rose-100" : "bg-slate-50 border-slate-100"
                       )}>
                         <div className={cn(
@@ -793,41 +1119,32 @@ function PatientProfileContent() {
                         )}>
                           {item.responseId === '2' ? <AlertTriangle size={20} /> : <Stethoscope size={20} />}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                             {item.question}
                           </p>
-                          <p className={cn(
-                            "text-sm font-bold leading-snug",
-                            item.responseId === '2' ? "text-rose-700" : "text-slate-700"
-                          )}>
-                            {item.alert || item.complement || "Sim"}
-                          </p>
+                          <textarea 
+                            rows={1}
+                            className={cn(
+                              "w-full bg-transparent border-none p-0 text-sm font-bold leading-snug focus:ring-0 resize-none outline-none",
+                              item.responseId === '2' ? "text-rose-700" : "text-slate-700"
+                            )}
+                            value={item.alert || item.complement || ""}
+                            onChange={(e) => {
+                                const newAnamnesis = [...patientEditForm.anamnesis];
+                                if (item.alert !== null) newAnamnesis[idx].alert = e.target.value;
+                                else newAnamnesis[idx].complement = e.target.value;
+                                setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
+                            }}
+                            placeholder="Adicionar observação..."
+                          />
                         </div>
                       </div>
                     ))
                   ) : (
-                    // Caso o paciente não tenha anamnese no banco, mostrar os campos padrão em branco
-                    [
-                      "Alergia a medicamentos? Quais?",
-                      "Usa Medicamentos? Quais?",
-                      "Pressão alta?",
-                      "Tem asma?",
-                      "Reação com anestésicos?",
-                      "Bruxismo (ranger dentes)?",
-                      "Está grávida?",
-                      "Tem sinusite?"
-                    ].map((q, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/30 flex gap-4 opacity-60">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white text-slate-300 border border-slate-50">
-                          <Stethoscope size={20} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{q}</p>
-                          <p className="text-sm font-bold text-slate-300 italic">Não informado</p>
-                        </div>
-                      </div>
-                    ))
+                    <div className="col-span-full py-12 text-center text-slate-400">
+                        <p className="text-sm font-bold uppercase">Carregando anamnese...</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -848,163 +1165,6 @@ function PatientProfileContent() {
           interventions={history?.interventions || []} 
           initialSelectedIntervention={initialFilesIntervention}
         />
-      )}
-
-      {/* Modal Editar Cadastro do Paciente */}
-      {isEditingPatient && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[32px] border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div>
-                <h3 className="font-bold text-slate-900">Editar Cadastro</h3>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações Pessoais</p>
-              </div>
-              <button onClick={() => setIsEditingPatient(false)} className="p-2 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-slate-200">
-                <Plus size={20} className="rotate-45 text-slate-400" />
-              </button>
-            </div>
-            
-            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nome Completo</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.name || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Telefone</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.phone || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">E-mail</label>
-                  <input 
-                    type="email"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.email || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, email: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">CPF</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.cpf || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, cpf: maskCPF(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">RG</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.rg || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, rg: maskRG(e.target.value) })}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Endereço</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.address || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, address: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Bairro</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.neighborhood || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, neighborhood: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Cidade</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.city || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, city: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Estado (UF)</label>
-                  <input 
-                    type="text"
-                    maxLength={2}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.state || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, state: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">CEP</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    value={patientEditForm.zipCode || ""}
-                    onChange={(e) => setPatientEditForm({ ...patientEditForm, zipCode: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Seção de Anamnese no Edit */}
-              {patientEditForm.anamnesis && patientEditForm.anamnesis.length > 0 && (
-                <div className="space-y-4 pt-6 border-t border-slate-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <HeartPulse size={18} className="text-rose-500" />
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações de Saúde (Anamnese)</h4>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    {patientEditForm.anamnesis.map((item: any, idx: number) => (
-                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                        <p className="text-[9px] font-black text-slate-400 uppercase">{item.question}</p>
-                        <textarea 
-                          className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 min-h-[60px] resize-none"
-                          value={item.alert || item.complement || ""}
-                          onChange={(e) => {
-                            const newAnamnesis = [...patientEditForm.anamnesis];
-                            if (item.alert !== null) newAnamnesis[idx].alert = e.target.value;
-                            else newAnamnesis[idx].complement = e.target.value;
-                            setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
-                          }}
-                          placeholder="Detalhes ou observações..."
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-              <button 
-                disabled={saving}
-                onClick={handleSavePatient}
-                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : "Salvar Alterações"}
-              </button>
-              <button 
-                onClick={() => setIsEditingPatient(false)}
-                className="flex-1 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

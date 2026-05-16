@@ -27,7 +27,7 @@ import {
   User,
   Printer
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, normalizeString } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FilesModal } from "@/components/FilesModal";
 import { DetailsModal } from "@/components/DetailsModal";
@@ -420,10 +420,11 @@ export default function PatientRecordPage() {
   };
 
   const formatCurrencyInput = (val: string) => {
-    // Keep only numbers
+    // Se o valor já vem formatado do catálogo ou digitado, extraímos apenas números
     const numericVal = val.replace(/\D/g, "");
-    if (!numericVal) return "";
-    // Treat as value in cents, divide by 100
+    if (!numericVal) return "R$ 0,00";
+    
+    // Trata como valor em centavos
     const floatVal = parseFloat(numericVal) / 100;
     return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
@@ -438,10 +439,10 @@ export default function PatientRecordPage() {
     const conv = catalogData?.convenios?.find(p => p.id === selectedConvenioId)?.name || "Particular";
     
     const baseValStr = treatmentValue.replace(/\D/g, '');
-    const baseVal = parseFloat(baseValStr) / 100 || 0;
+    const baseVal = (parseInt(baseValStr) || 0) / 100;
     
     const discStr = discountValue.replace(/\D/g, '');
-    const disc = parseFloat(discStr) / 100 || 0;
+    const disc = (parseInt(discStr) || 0) / 100;
     
     const finalVal = Math.max(0, baseVal - disc);
     
@@ -501,6 +502,7 @@ export default function PatientRecordPage() {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
       <header className="w-full px-6 py-2 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 z-50 shadow-sm gap-4">
+        {/* ... existing header content ... */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)} className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold outline-none" />
@@ -583,15 +585,7 @@ export default function PatientRecordPage() {
                          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Dente {item.tooth}</span>
                       </div>
                       <h4 className="text-[10px] font-black text-slate-800 uppercase line-clamp-2 leading-tight h-7">
-                        {(() => {
-                           const parts = item.procedure.split('|');
-                           // If the first part is 'PROCEDIMENTO: ' or empty, try the second part
-                           let name = parts[0].replace('PROCEDIMENTO:', '').trim();
-                           if (!name || name === 'PROCEDIMENTO:' || name.length < 3) {
-                              return parts.length > 1 ? parts[1].trim() : name;
-                           }
-                           return name;
-                        })()}
+                        {item.procedure}
                       </h4>
                       <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-50">
                          <div className="flex flex-col">
@@ -636,7 +630,7 @@ export default function PatientRecordPage() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                      {catalogData?.specialties?.map(specialty => {
-                        const procs = catalogData.procedures.filter(p => p.specialtyId === specialty.id && p.name?.toLowerCase().includes(procedureSearchTerm.toLowerCase()));
+                        const procs = catalogData.procedures.filter(p => p.specialtyId === specialty.id && normalizeString(p.name).includes(normalizeString(procedureSearchTerm)));
                         if (procs.length === 0) return null;
                         
                         const isExpanded = procedureSearchTerm.length > 0 || expandedCategories.includes(specialty.id);
@@ -654,7 +648,19 @@ export default function PatientRecordPage() {
                               {isExpanded && (
                                  <div className="p-2 space-y-1">
                                     {procs.map(i => (
-                                       <button key={i.id} onClick={() => {setSelectedTreatment(i.name); setSelectedTreatmentId(i.id); setTreatmentValue(i.price.toString());}} className={cn("w-full text-left p-3 rounded-xl text-[10px] font-bold border transition-all", selectedTreatmentId === i.id ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-100 hover:bg-blue-50")}>{i.name}</button>
+                                       <button 
+                                          key={i.id} 
+                                          onClick={() => {
+                                             setSelectedTreatment(i.name); 
+                                             setSelectedTreatmentId(i.id); 
+                                             // Convert explicit price (e.g. 50.00) to cents (5000) for the formatter
+                                             const priceInCents = Math.round((i.price || 0) * 100);
+                                             setTreatmentValue(formatCurrencyInput(priceInCents.toString()));
+                                          }} 
+                                          className={cn("w-full text-left p-3 rounded-xl text-[10px] font-bold border transition-all", selectedTreatmentId === i.id ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-100 hover:bg-blue-50")}
+                                       >
+                                          {i.name}
+                                       </button>
                                     ))}
                                  </div>
                               )}
@@ -815,7 +821,7 @@ export default function PatientRecordPage() {
                            
                            {showMedicationSearch && (
                               <div className="absolute top-full left-0 right-12 mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl z-50 p-2 flex flex-col gap-1 max-h-40 overflow-y-auto" onMouseLeave={() => setShowMedicationSearch(false)}>
-                                 {medicationsDB.filter(m => m.name.toLowerCase().includes(prescriptionForm.medication.toLowerCase())).map(med => (
+                                 {medicationsDB.filter(m => normalizeString(m.name).includes(normalizeString(prescriptionForm.medication))).map(med => (
                                     <button 
                                        key={med.code} 
                                        onClick={() => {

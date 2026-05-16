@@ -42,6 +42,10 @@ export default function FinanceiroPage() {
     paymentMethodId: "4" // Dinheiro padrão
   });
 
+  // Filter State
+  const [filterMode, setFilterMode] = useState<"all" | "income" | "expense" | "pending">("all");
+  const [descriptionFilter, setDescriptionFilter] = useState("");
+
   const fetchFinance = useCallback(async () => {
     setLoading(true);
     try {
@@ -110,6 +114,37 @@ export default function FinanceiroPage() {
     return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  const handleDelete = async (id: string, type: string) => {
+    if (!confirm("Tem certeza que deseja excluir este lançamento?")) return;
+    try {
+      const res = await fetch(`/api/financeiro?id=${id}&type=${type}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchFinance();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const filteredTransactions = (() => {
+    let list = filterMode === 'pending' ? (data?.pendingTransactions || []) : (data?.transactions || []);
+    
+    if (filterMode !== 'all' && filterMode !== 'pending') {
+      list = list.filter((t: any) => t.type === filterMode);
+    }
+    
+    if (descriptionFilter) {
+      list = list.filter((t: any) => 
+        t.description?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(descriptionFilter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")) ||
+        t.patientName?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(descriptionFilter.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
+      );
+    }
+    
+    return list;
+  })();
+
   return (
     <div className="flex flex-col h-full bg-slate-50/50 p-6 space-y-6 overflow-hidden relative">
       {/* Header */}
@@ -151,45 +186,82 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <button 
+          onClick={() => setFilterMode('income')}
+          className={cn(
+            "bg-white p-6 rounded-[40px] border transition-all text-left group",
+            filterMode === 'income' ? "border-emerald-500 ring-4 ring-emerald-50" : "border-slate-200 hover:border-emerald-200"
+          )}
+        >
+           <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
                  <ArrowUpCircle size={24} />
               </div>
               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg">Entradas</span>
            </div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Faturamento Bruto</p>
-              <h2 className="text-2xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.income || 0)}</h2>
+              <h2 className="text-xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.income || 0)}</h2>
            </div>
-        </div>
+        </button>
 
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+        <button 
+          onClick={() => setFilterMode('expense')}
+          className={cn(
+            "bg-white p-6 rounded-[40px] border transition-all text-left group",
+            filterMode === 'expense' ? "border-rose-500 ring-4 ring-rose-50" : "border-slate-200 hover:border-rose-200"
+          )}
+        >
+           <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl group-hover:scale-110 transition-transform">
                  <ArrowDownCircle size={24} />
               </div>
               <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded-lg">Saídas</span>
            </div>
            <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Custos / Despesas</p>
-              <h2 className="text-2xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.expenses || 0)}</h2>
+              <h2 className="text-xl font-black text-slate-900 mt-1">{loading ? "---" : formatCurrency(data?.summary?.expenses || 0)}</h2>
            </div>
-        </div>
+        </button>
 
-        <div className="bg-blue-600 p-8 rounded-[40px] shadow-xl shadow-blue-100 space-y-4">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-white/20 text-white rounded-2xl">
+        <button 
+          onClick={() => setFilterMode('all')}
+          className={cn(
+            "p-6 rounded-[40px] shadow-xl transition-all text-left group",
+            filterMode === 'all' ? "bg-blue-600 text-white shadow-blue-200 ring-4 ring-blue-50" : "bg-white border border-slate-200 text-slate-900 hover:border-blue-200"
+          )}
+        >
+           <div className="flex items-center justify-between mb-4">
+              <div className={cn("p-3 rounded-2xl group-hover:scale-110 transition-transform", filterMode === 'all' ? "bg-white/20" : "bg-blue-50 text-blue-600")}>
                  <Wallet size={24} />
               </div>
-              <span className="text-[10px] font-black text-white uppercase tracking-widest bg-white/10 px-2 py-1 rounded-lg">Saldo</span>
+              <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg", filterMode === 'all' ? "bg-white/10" : "bg-blue-50 text-blue-600")}>Saldo</span>
            </div>
            <div>
-              <p className="text-[10px] font-black text-blue-100 uppercase tracking-widest">Lucro Líquido</p>
-              <h2 className="text-2xl font-black text-white mt-1">{loading ? "---" : formatCurrency(data?.summary?.balance || 0)}</h2>
+              <p className={cn("text-[10px] font-black uppercase tracking-widest", filterMode === 'all' ? "text-blue-100" : "text-slate-400")}>Lucro Líquido</p>
+              <h2 className="text-xl font-black mt-1">{loading ? "---" : formatCurrency(data?.summary?.balance || 0)}</h2>
            </div>
-        </div>
+        </button>
+
+        <button 
+          onClick={() => setFilterMode('pending')}
+          className={cn(
+            "p-6 rounded-[40px] border transition-all text-left group",
+            filterMode === 'pending' ? "bg-amber-500 border-amber-500 text-white shadow-xl shadow-amber-100 ring-4 ring-amber-50" : "bg-amber-50 border-amber-100 text-slate-900 hover:border-amber-300"
+          )}
+        >
+           <div className="flex items-center justify-between mb-4">
+              <div className={cn("p-3 rounded-2xl group-hover:scale-110 transition-transform", filterMode === 'pending' ? "bg-white/20" : "bg-white shadow-sm text-amber-600")}>
+                 <TrendingUp size={24} />
+              </div>
+              <span className={cn("text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg", filterMode === 'pending' ? "bg-white/10 text-white" : "bg-amber-100 text-amber-700")}>A Receber</span>
+           </div>
+           <div>
+              <p className={cn("text-[10px] font-black uppercase tracking-widest", filterMode === 'pending' ? "text-amber-100" : "text-amber-600/70")}>Saldo Pendente</p>
+              <h2 className="text-xl font-black mt-1">{loading ? "---" : formatCurrency(data?.summary?.pending || 0)}</h2>
+           </div>
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -197,15 +269,30 @@ export default function FinanceiroPage() {
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <History size={18} className="text-slate-400" />
-              <h3 className="font-bold text-slate-900 uppercase text-[12px] tracking-widest">Movimentações Recentes</h3>
+              <h3 className="font-bold text-slate-900 uppercase text-[12px] tracking-widest">
+                {filterMode === 'all' && "Todas as Movimentações"}
+                {filterMode === 'income' && "Apenas Entradas"}
+                {filterMode === 'expense' && "Apenas Saídas"}
+                {filterMode === 'pending' && "Previsão de Recebimentos"}
+              </h3>
            </div>
-           <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              <input 
-                type="text" 
-                placeholder="Filtrar descrição..." 
-                className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none w-64 focus:bg-white transition-all"
-              />
+           <div className="flex items-center gap-4">
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                 <button onClick={() => setFilterMode('all')} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", filterMode === 'all' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Tudo</button>
+                 <button onClick={() => setFilterMode('income')} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", filterMode === 'income' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Entradas</button>
+                 <button onClick={() => setFilterMode('expense')} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", filterMode === 'expense' ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Saídas</button>
+                 <button onClick={() => setFilterMode('pending')} className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", filterMode === 'pending' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>A Receber</button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="Filtrar por nome ou desc..." 
+                  className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none w-64 focus:bg-white transition-all"
+                  value={descriptionFilter}
+                  onChange={e => setDescriptionFilter(e.target.value)}
+                />
+              </div>
            </div>
         </div>
 
@@ -214,10 +301,10 @@ export default function FinanceiroPage() {
             <div className="h-full flex items-center justify-center">
               <Loader2 className="animate-spin text-blue-600" size={32} />
             </div>
-          ) : data?.transactions?.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-20">
                <TrendingUp size={64} className="text-slate-300 mb-4" />
-               <p className="font-black uppercase text-xs tracking-widest">Sem movimentações no período</p>
+               <p className="font-black uppercase text-xs tracking-widest">Nenhum registro encontrado</p>
             </div>
           ) : (
             <table className="w-full">
@@ -228,18 +315,22 @@ export default function FinanceiroPage() {
                     <th className="px-8 py-4 text-left">Origem / Destino</th>
                     <th className="px-8 py-4 text-left">Tipo de Pagto</th>
                     <th className="px-8 py-4 text-right">Valor</th>
+                    <th className="px-8 py-4 text-center">Ações</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                 {data?.transactions?.map((t: any) => (
-                   <tr key={t.id} className="group hover:bg-slate-50/50 transition-colors">
+                 {filteredTransactions.map((t: any, idx: number) => (
+                   <tr key={t.id || `row-${filterMode}-${idx}`} className="group hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-5">
                          <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">
                            {new Date(t.date).toLocaleDateString('pt-BR')}
                          </span>
                       </td>
                       <td className="px-8 py-5">
-                         <p className="text-xs font-bold text-slate-800 uppercase leading-snug">{t.description || "Pagamento de Procedimento"}</p>
+                         <p className={cn(
+                            "text-xs font-bold uppercase leading-snug",
+                            t.type === 'pending' ? "text-amber-700/70" : "text-slate-800"
+                         )}>{t.description || "Pagamento de Procedimento"}</p>
                       </td>
                       <td className="px-8 py-5">
                          <div className="flex items-center gap-2">
@@ -254,16 +345,28 @@ export default function FinanceiroPage() {
                       <td className="px-8 py-5">
                          <div className="flex items-center gap-1.5 text-slate-500">
                             <CreditCard size={12} />
-                            <span className="text-[10px] font-black uppercase tracking-tight">{t.paymentMethod || "---"}</span>
+                            <span className="text-[10px] font-black uppercase tracking-tight">{t.paymentMethod || (t.type === 'pending' ? "PENDENTE" : "---")}</span>
                          </div>
                       </td>
                       <td className="px-8 py-5 text-right">
                          <span className={cn(
                            "text-xs font-black",
-                           t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                           t.type === 'income' ? "text-emerald-600" : 
+                           t.type === 'expense' ? "text-rose-600" : "text-amber-500"
                          )}>
-                            {t.type === 'income' ? "+" : "-"} {formatCurrency(parseFloat(t.value))}
+                            {t.type === 'income' ? "+" : t.type === 'expense' ? "-" : "≈"} {formatCurrency(parseFloat(t.value))}
                          </span>
+                      </td>
+                      <td className="px-8 py-5 text-center">
+                        {t.type !== 'pending' && (
+                          <button 
+                            onClick={() => handleDelete(t.id, t.type)}
+                            className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            title="Excluir Lançamento"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
                       </td>
                    </tr>
                  ))}

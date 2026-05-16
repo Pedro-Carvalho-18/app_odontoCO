@@ -28,19 +28,48 @@ export async function GET(request: Request) {
     
     const params: any[] = [];
 
+    // Helper function to normalize SQLite column/value for accent-insensitivity
+    const sqliteNormalize = (col: string) => {
+      let result = `LOWER(${col})`;
+      const replacements = [
+        ['á', 'a'], ['à', 'a'], ['â', 'a'], ['ã', 'a'], ['ä', 'a'],
+        ['é', 'e'], ['è', 'e'], ['ê', 'e'], ['ë', 'e'],
+        ['í', 'i'], ['ì', 'i'], ['î', 'i'], ['ï', 'i'],
+        ['ó', 'o'], ['ò', 'o'], ['ô', 'o'], ['õ', 'o'], ['ö', 'o'],
+        ['ú', 'u'], ['ù', 'u'], ['û', 'u'], ['ü', 'u'],
+        ['ç', 'c']
+      ];
+      replacements.forEach(([acc, base]) => {
+        result = `REPLACE(${result}, '${acc}', '${base}')`;
+      });
+      return result;
+    };
+
+    const normalizeValue = (val: string) => {
+      return val.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    };
+
     if (query) {
-      sql += ` WHERE PRINOM LIKE ? OR SEGNOM LIKE ? OR CIC LIKE ? OR EMAIL LIKE ?`;
-      const searchPattern = `%${query}%`;
+      const normalizedQuery = normalizeValue(query);
+      const searchPattern = `%${normalizedQuery}%`;
+      
+      sql += ` WHERE ${sqliteNormalize('PRINOM')} LIKE ? 
+                OR ${sqliteNormalize('SEGNOM')} LIKE ? 
+                OR CIC LIKE ? 
+                OR LOWER(EMAIL) LIKE ?`;
+      
       params.push(searchPattern, searchPattern, searchPattern, searchPattern);
       
       // Priorizar nomes que COMEÇAM com a busca
       sql += ` ORDER BY 
         CASE 
-          WHEN PRINOM LIKE ? THEN 1
+          WHEN ${sqliteNormalize('PRINOM')} LIKE ? THEN 1
           ELSE 2 
         END, 
         PRINOM ASC`;
-      params.push(`${query}%`);
+      params.push(`${normalizedQuery}%`);
     } else {
       sql += ` ORDER BY PRINOM ASC`;
     }
@@ -54,8 +83,12 @@ export async function GET(request: Request) {
     let countSql = `SELECT COUNT(*) as total FROM PESSOAL`;
     const countParams: any[] = [];
     if (query) {
-       countSql += ` WHERE PRINOM LIKE ? OR SEGNOM LIKE ? OR CIC LIKE ? OR EMAIL LIKE ?`;
-       countParams.push(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`);
+       const normalizedQuery = normalizeValue(query);
+       countSql += ` WHERE ${sqliteNormalize('PRINOM')} LIKE ? 
+                      OR ${sqliteNormalize('SEGNOM')} LIKE ? 
+                      OR CIC LIKE ? 
+                      OR LOWER(EMAIL) LIKE ?`;
+       countParams.push(`%${normalizedQuery}%`, `%${normalizedQuery}%`, `%${normalizedQuery}%`, `%${normalizedQuery}%`);
     }
     const countResult = await db.get(countSql, countParams);
     const total = countResult?.total || 0;
