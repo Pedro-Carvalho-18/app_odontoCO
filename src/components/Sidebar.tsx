@@ -51,14 +51,6 @@ export function Sidebar() {
     return () => window.removeEventListener('profile-updated', loadProfile);
   }, []);
 
-  const initials = profile.name
-    .split(' ')
-    .filter(n => n)
-    .map(n => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <aside 
       className={cn(

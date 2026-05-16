@@ -7,7 +7,6 @@ import {
   Shield, 
   Bell, 
   Database, 
-  LogOut, 
   Camera,
   ChevronRight,
   Stethoscope,
@@ -282,11 +281,6 @@ export default function PerfilPage() {
               <ChevronRight size={16} className={activeTab === item.id ? "opacity-100" : "opacity-0"} />
             </button>
           ))}
-          
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-rose-600 hover:bg-rose-50 transition-all mt-8">
-            <LogOut size={18} />
-            Sair do Sistema
-          </button>
         </div>
 
         {/* Main Content Area */}
@@ -433,6 +427,16 @@ export default function PerfilPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab !== "perfil" && activeTab !== "clinica" && activeTab !== "banco" && (
+            <div className="bg-white rounded-[40px] border border-slate-200 p-12 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
+                <Settings size={32} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-2">Em Desenvolvimento</h3>
+              <p className="text-xs text-slate-500 max-w-xs">Esta seção de configurações será implementada em breve para permitir o controle total do seu sistema.</p>
             </div>
           )}
         </div>

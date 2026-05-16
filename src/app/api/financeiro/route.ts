@@ -50,56 +50,58 @@ export async function GET(request: Request) {
     );
 
     // 3. Saldo Pendente (Total que falta receber de todos os pacientes)
-    // Buscamos intervenções que não estão totalmente pagas
     const pendingInterventions = await db.all(`
       SELECT 
-        I.VALOR_PACIENTE as value,
+        CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT) as value,
         I.ORCAMENTO as paidInst,
         I.OBSERV as notes,
         I.NROINTPAC,
+        I.STATUS,
         I.DATCAD as date,
         TRIM(P.PRINOM || ' ' || COALESCE(P.SEGNOM, '')) as patientName
       FROM INTERVENCAO I
       LEFT JOIN PESSOAL P ON I.NROPAC = P.NROPAC
       WHERE I.STATUS != '3' -- Ignorar cancelados
+      AND (I.VALOR_PACIENTE > 0 OR I.STATUS = '1')
     `);
 
     const pendingTransactions: any[] = [];
     let globalCounter = 0;
     const totalPending = pendingInterventions.reduce((sum, inter) => {
-      // Tenta extrair o total de parcelas do OBSERV (X/Yx)
+      // Tenta extrair o total de parcelas do OBSERV (X/Yx) ou (Yx)
       let total = 1;
       const notes = inter.notes || "";
-      let procName = notes.split('|')[0].replace('PROCEDIMENTO:', '').trim() || 'Procedimento';
+      const procName = notes.split('|')[0].replace('PROCEDIMENTO:', '').trim() || 'Procedimento';
       
-      if (notes.includes('/')) {
-        const match = notes.match(/\/(\d+)x\)/);
-        if (match) total = parseInt(match[1]) || 1;
-      } else if (notes.includes('(')) {
-        const match = notes.match(/\((\d+)x\)/);
-        if (match) total = parseInt(match[1]) || 1;
+      // Regex aprimorada: (3x), (3 x), (1/3x), (1/3 X)
+      const installmentRegex = /(?:\/|\()(\d+)\s*x\)/i;
+      const match = notes.match(installmentRegex);
+      if (match) {
+        total = parseInt(match[1]) || 1;
       }
 
       const paid = parseInt(inter.paidInst || '0') || 0;
       
-      if (paid < total) {
-        const valPerInst = (inter.value || 0) / total;
-        const unpaidCount = total - paid;
+      // Se for Status 1 (Em Aberto) e não tiver parcelas marcadas como pagas, 
+      // ou se tiver parcelas a pagar
+      if (paid < total || (inter.STATUS === '1' && paid === 0)) {
+        const valPerInst = (inter.value || 0) / (total || 1);
+        const unpaidCount = Math.max(0, total - paid);
         
-        // Adicionar detalhamento para o extrato pendente com ID global único e descrição rica
-        for (let i = paid + 1; i <= total; i++) {
-           globalCounter++;
-           pendingTransactions.push({
-              id: `pending-item-${globalCounter}-${inter.NROINTPAC || 'no-id'}`,
-              date: inter.date || new Date().toISOString(),
-              description: `A RECEBER: Parcela ${i}/${total} - ${inter.patientName} - ${procName}`,
-              value: valPerInst,
-              patientName: inter.patientName,
-              type: 'pending'
-           });
+        if (unpaidCount > 0 && valPerInst > 0) {
+          for (let i = paid + 1; i <= total; i++) {
+             globalCounter++;
+             pendingTransactions.push({
+                id: `pending-item-${globalCounter}-${inter.NROINTPAC || 'no-id'}`,
+                date: inter.date || new Date().toISOString(),
+                description: `A RECEBER: Parcela ${i}/${total} - ${inter.patientName} - ${procName}`,
+                value: valPerInst,
+                patientName: inter.patientName,
+                type: 'pending'
+             });
+          }
+          return sum + (valPerInst * unpaidCount);
         }
-
-        return sum + (valPerInst * unpaidCount);
       }
       return sum;
     }, 0);
