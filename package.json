@@ -1,6 +1,8 @@
 {
   "name": "app_odonto",
   "version": "0.1.0",
+  "description": "Sistema de Gestão Odontológica OdontoCO",
+  "author": "OdontoCO",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -9,11 +11,10 @@
     "start": "next start",
     "lint": "eslint",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "dist": "npm run build && cross-env CSC_SKIP_SIGN=true electron-builder --win",
-    "clean-cache": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force $env:LOCALAPPDATA\\electron-builder\\Cache\""
+    "dist": "npm run build && electron-builder --win --portable -c.win.signingHashAlgorithms=[]"
   },
   "build": {
-    "appId": "com.odonto.app",
+    "appId": "com.odontoco.app",
     "productName": "OdontoCO",
     "win": {
       "target": [
@@ -21,8 +22,7 @@
         "portable"
       ],
       "icon": "Imagens/AppIcone.png",
-      "forceCodeSigning": false,
-      "signingHashAlgorithms": []
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,
@@ -53,8 +53,6 @@
     "cross-env": "^10.1.0",
     "electron": "^41.6.1",
     "electron-builder": "^26.8.1",
-    "electron-builder-squirrel-windows": "^26.8.1",
-    "electron-packager": "^17.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
     "tailwindcss": "^4",
