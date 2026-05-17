@@ -13,9 +13,12 @@ export async function POST(
     await db.run(
       `UPDATE PESSOAL SET 
         PRINOM = ?,
+        APELIDO = ?,
         EMAIL = ?,
         FONE1 = ?,
         DATNAS = ?,
+        SEXO = ?,
+        ESTCIVIL = ?,
         CIC = ?,
         RG = ?,
         ENDRES = ?,
@@ -23,21 +26,34 @@ export async function POST(
         CIDRES = ?,
         ESTRES = ?,
         CEPRES = ?,
-        PROFIS = ?
+        PROFIS = ?,
+        ID_CONVENIO = ?,
+        MATRICULA = ?,
+        ID_PRESTADOR = ?,
+        TIPO_INDICA = ?,
+        STATUS = ?
       WHERE NROPAC = ?`,
       [
         body.name,
-        body.email,
-        body.phone,
-        body.birthDate,
-        body.cpf,
-        body.rg,
-        body.address,
-        body.neighborhood,
-        body.city,
-        body.state,
-        body.zipCode,
-        body.profession,
+        body.nickname || null,
+        body.email || null,
+        body.phone || null,
+        body.birthDate || null,
+        body.sex || "2",
+        body.maritalStatus || "6",
+        body.cpf || null,
+        body.rg || null,
+        body.address || null,
+        body.neighborhood || null,
+        body.city || "ARARAQUARA",
+        body.state || "SP",
+        body.zipCode || null,
+        body.profession || null,
+        body.convenioId || "1",
+        body.registrationNumber || null,
+        body.preferredProfessionalId || "1",
+        body.referralTypeId || "3",
+        body.status || "2",
         id
       ]
     );
@@ -45,11 +61,10 @@ export async function POST(
     // 2. Atualizar Anamnese (Saúde)
     if (body.anamnesis && Array.isArray(body.anamnesis)) {
       for (const item of body.anamnesis) {
-        // Precisamos encontrar o ID_RSP_ITEM para este paciente e pergunta
-        // Uma forma segura é buscar pelo ID_PESSOA e TX_PERGUNTA via JOIN
         await db.run(
           `UPDATE ANAMNESE_RSP_ITEM SET 
-            TX_COMPLEMENTO = ?
+            TX_COMPLEMENTO = ?,
+            ID_OPCAO_RSP = ?
           WHERE ID_RSP_ITEM IN (
             SELECT RI.ID_RSP_ITEM 
             FROM ANAMNESE_RSP_ITEM RI
@@ -58,7 +73,8 @@ export async function POST(
             WHERE R.ID_PESSOA = ? AND QI.TX_PERGUNTA = ?
           )`,
           [
-            item.alert || item.complement || "", 
+            item.complement || item.alert || "", 
+            item.responseId || "0",
             id, 
             item.question
           ]

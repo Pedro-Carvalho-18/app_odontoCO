@@ -14,9 +14,12 @@ export async function GET(
       `SELECT 
         NROPAC as id,
         PRINOM as name,
+        APELIDO as nickname,
         EMAIL as email,
         FONE1 as phone,
         DATNAS as birthDate,
+        SEXO as sex,
+        ESTCIVIL as maritalStatus,
         CIC as cpf,
         RG as rg,
         ENDRES as address,
@@ -25,6 +28,10 @@ export async function GET(
         ESTRES as state,
         CEPRES as zipCode,
         PROFIS as profession,
+        ID_CONVENIO as convenioId,
+        MATRICULA as registrationNumber,
+        ID_PRESTADOR as preferredProfessionalId,
+        TIPO_INDICA as referralTypeId,
         STATUS as status
       FROM PESSOAL 
       WHERE NROPAC = ?`,

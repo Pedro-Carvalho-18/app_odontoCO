@@ -45,15 +45,51 @@ export default function PatientsPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const maritalStatuses = [
+    { id: "1", name: "Casado(a)" },
+    { id: "2", name: "Desquitado(a)" },
+    { id: "3", name: "Divorciado(a)" },
+    { id: "4", name: "Outro" },
+    { id: "5", name: "Separado(a)" },
+    { id: "6", name: "Solteiro(a)" },
+    { id: "7", name: "Viúvo(a)" }
+  ];
+
+  const referralTypes = [
+    { id: "1", name: "Paciente" },
+    { id: "2", name: "Contato" },
+    { id: "3", name: "Mídia" }
+  ];
+
+  const genders = [
+    { id: "1", name: "Masculino" },
+    { id: "2", name: "Feminino" }
+  ];
+
+  const patientStatuses = [
+    { id: "2", name: "Ativo" },
+    { id: "3", name: "Em tratamento" },
+    { id: "1", name: "Inativo" }
+  ];
+
   const initialAnamnesis = [
-    { id: "2", question: "Alergia a medicamentos? Quais?" },
     { id: "1", question: "Usa Medicamentos? Quais?" },
+    { id: "2", question: "Apresenta alergia a medicamentos? Quais?" },
     { id: "3", question: "Pressão alta?" },
+    { id: "4", question: "Está sob cuidados médicos? Por quê?" },
+    { id: "5", question: "Quando fez seu último tratamento dentário?" },
+    { id: "6", question: "Range os dentes à noite?" },
+    { id: "7", question: "Complicações em tratamentos anteriores?" },
+    { id: "8", question: "Tem sinusite?" },
+    { id: "9", question: "Sua pressão sanguínea é alta?" },
+    { id: "10", question: "Toma ASS?" },
     { id: "11", question: "Tem asma?" },
-    { id: "13", question: "Reação com anestésicos?" },
-    { id: "6", question: "Bruxismo (ranger dentes)?" },
-    { id: "17", question: "Está grávida?" },
-    { id: "8", question: "Tem sinusite?" }
+    { id: "12", question: "Tem alguma alergia?" },
+    { id: "13", question: "Já teve alguma reação com anestésicos?" },
+    { id: "14", question: "Tem algum diabético em sua família?" },
+    { id: "15", question: "Costuma desmaiar com frequência?" },
+    { id: "16", question: "Considera-se nervoso(a)?" },
+    { id: "17", question: "A senhora está grávida?" }
   ];
 
   const [newPatientForm, setNewPatientForm] = useState({
@@ -63,14 +99,43 @@ export default function PatientsPage() {
     cpf: "",
     rg: "",
     birthDate: "",
+    sex: "2", // Default to Female based on DB sample observation
+    maritalStatus: "6", // Default to Solteiro
     address: "",
     neighborhood: "",
-    city: "",
-    state: "",
+    city: "ARARAQUARA",
+    state: "SP",
     zipCode: "",
     profession: "",
+    nickname: "",
+    convenioId: "1", // Default to Particular
+    registrationNumber: "",
+    preferredProfessionalId: "1",
+    referralTypeId: "3",
+    status: "2", // Default to Ativo
     anamnesis: initialAnamnesis.map(q => ({ ...q, value: "" }))
   });
+
+  const [catalogOptions, setCatalogOptions] = useState<{
+    professionals: any[];
+    convenios: any[];
+  }>({ professionals: [], convenios: [] });
+
+  useEffect(() => {
+    async function loadOptions() {
+      try {
+        const res = await fetch('/api/catalogo');
+        const data = await res.json();
+        setCatalogOptions({
+          professionals: data.professionals || [],
+          convenios: data.convenios || []
+        });
+      } catch (err) {
+        console.error("Failed to load catalog options:", err);
+      }
+    }
+    loadOptions();
+  }, []);
 
   const maskCPF = (value: string) => {
     return value
@@ -295,8 +360,8 @@ export default function PatientsPage() {
 
       {/* Modal Novo Paciente */}
       {showNewModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-2xl rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center animate-in fade-in duration-300">
+          <div className="bg-white w-full h-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
             <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100"><UserPlus size={20} /></div>
@@ -308,52 +373,126 @@ export default function PatientsPage() {
                <button onClick={() => setShowNewModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
             </div>
 
-            <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.name}
-                    onChange={e => setNewPatientForm({...newPatientForm, name: e.target.value})}
-                  />
+            <div className="p-8 space-y-8 overflow-y-auto flex-1 custom-scrollbar">
+              {/* Informações Pessoais */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-4 bg-blue-600 rounded-full" />
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações Pessoais</h4>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.phone}
-                    onChange={e => setNewPatientForm({...newPatientForm, phone: e.target.value})}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-200 transition-all" value={newPatientForm.name} onChange={e => setNewPatientForm({...newPatientForm, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Apelido</label>
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.nickname} onChange={e => setNewPatientForm({...newPatientForm, nickname: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
+                    <input type="date" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.birthDate} onChange={e => setNewPatientForm({...newPatientForm, birthDate: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sexo</label>
+                    <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.sex} onChange={e => setNewPatientForm({...newPatientForm, sex: e.target.value})}>
+                      {genders.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado Civil</label>
+                    <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.maritalStatus} onChange={e => setNewPatientForm({...newPatientForm, maritalStatus: e.target.value})}>
+                      {maritalStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.cpf} onChange={e => setNewPatientForm({...newPatientForm, cpf: maskCPF(e.target.value)})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">RG</label>
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.rg} onChange={e => setNewPatientForm({...newPatientForm, rg: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Profissão</label>
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.profession} onChange={e => setNewPatientForm({...newPatientForm, profession: e.target.value})} />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
-                  <input 
-                    type="email" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.email}
-                    onChange={e => setNewPatientForm({...newPatientForm, email: e.target.value})}
-                  />
+              </div>
+
+              {/* Contato e Convênio */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-emerald-500 rounded-full" />
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contato e Localização</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
+                      <input type="email" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.email} onChange={e => setNewPatientForm({...newPatientForm, email: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.phone} onChange={e => setNewPatientForm({...newPatientForm, phone: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.zipCode} onChange={e => setNewPatientForm({...newPatientForm, zipCode: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label>
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.address} onChange={e => setNewPatientForm({...newPatientForm, address: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bairro</label>
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.neighborhood} onChange={e => setNewPatientForm({...newPatientForm, neighborhood: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade / UF</label>
+                      <div className="flex gap-2">
+                        <input type="text" className="flex-1 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.city} onChange={e => setNewPatientForm({...newPatientForm, city: e.target.value})} />
+                        <input type="text" maxLength={2} className="w-12 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none text-center" value={newPatientForm.state} onChange={e => setNewPatientForm({...newPatientForm, state: e.target.value.toUpperCase()})} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.cpf}
-                    onChange={e => setNewPatientForm({...newPatientForm, cpf: maskCPF(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.birthDate}
-                    onChange={e => setNewPatientForm({...newPatientForm, birthDate: e.target.value})}
-                  />
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-purple-500 rounded-full" />
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Configurações de Atendimento</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Convênio</label>
+                      <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.convenioId} onChange={e => setNewPatientForm({...newPatientForm, convenioId: e.target.value})}>
+                        {catalogOptions.convenios.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Matrícula</label>
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.registrationNumber} onChange={e => setNewPatientForm({...newPatientForm, registrationNumber: e.target.value})} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dentista Preferencial</label>
+                      <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.preferredProfessionalId} onChange={e => setNewPatientForm({...newPatientForm, preferredProfessionalId: e.target.value})}>
+                        {catalogOptions.professionals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Indicação</label>
+                      <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.referralTypeId} onChange={e => setNewPatientForm({...newPatientForm, referralTypeId: e.target.value})}>
+                        {referralTypes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status Inicial</label>
+                      <select className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.status} onChange={e => setNewPatientForm({...newPatientForm, status: e.target.value})}>
+                        {patientStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -361,12 +500,12 @@ export default function PatientsPage() {
               <div className="space-y-4 pt-6 border-t border-slate-100">
                 <div className="flex items-center gap-2 mb-4">
                   <HeartPulse size={18} className="text-rose-500" />
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ficha de Saúde Inicial</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ficha de Saúde Inicial (Anamnese)</h4>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {newPatientForm.anamnesis.map((item, idx) => (
                     <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase leading-tight block">{item.question}</label>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase leading-tight block min-h-[20px]">{item.question}</label>
                       <input 
                         type="text"
                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
@@ -380,37 +519,6 @@ export default function PatientsPage() {
                       />
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-100">
-                <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.address}
-                    onChange={e => setNewPatientForm({...newPatientForm, address: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label>
-                  <input 
-                    type="text" 
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.city}
-                    onChange={e => setNewPatientForm({...newPatientForm, city: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado (UF)</label>
-                  <input 
-                    type="text" 
-                    maxLength={2}
-                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none"
-                    value={newPatientForm.state}
-                    onChange={e => setNewPatientForm({...newPatientForm, state: e.target.value.toUpperCase()})}
-                  />
                 </div>
               </div>
             </div>

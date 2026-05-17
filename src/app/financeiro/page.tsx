@@ -212,7 +212,7 @@ export default function FinanceiroPage() {
           nroPac,
           nroPar,
           value: item.value,
-          description: item.description.replace('A RECEBER: ', 'Pg ')
+          description: item.description.replace('A RECEBER: LANÇAMENTO: ', 'Pg ').replace('A RECEBER: ', 'Pg ')
         })
       });
       if (res.ok) fetchFinance();

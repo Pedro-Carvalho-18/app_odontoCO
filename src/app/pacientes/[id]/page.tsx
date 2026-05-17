@@ -79,35 +79,91 @@ function PatientProfileContent() {
   const [isEditingPatient, setIsEditingPatient] = useState(false);
   const [patientEditForm, setPatientEditForm] = useState<any>({});
 
-  const prestadores = [
-    { id: "1", nome: "Dr. Carlos Cesar de Carvalho" },
-    { id: "2", nome: "Drª Esmeralda Dos Santos Offredi" },
-    { id: "255", nome: "Clínica" }
+  const maritalStatuses = [
+    { id: "1", name: "Casado(a)" },
+    { id: "2", name: "Desquitado(a)" },
+    { id: "3", name: "Divorciado(a)" },
+    { id: "4", name: "Outro" },
+    { id: "5", name: "Separado(a)" },
+    { id: "6", name: "Solteiro(a)" },
+    { id: "7", name: "Viúvo(a)" }
   ];
+
+  const referralTypes = [
+    { id: "1", name: "Paciente" },
+    { id: "2", name: "Contato" },
+    { id: "3", name: "Mídia" }
+  ];
+
+  const genders = [
+    { id: "1", name: "Masculino" },
+    { id: "2", name: "Feminino" }
+  ];
+
+  const patientStatuses = [
+    { id: "2", name: "Ativo" },
+    { id: "3", name: "Em tratamento" },
+    { id: "1", name: "Inativo" }
+  ];
+
+  const initialAnamnesisQuestions = [
+    { id: "1", question: "Usa Medicamentos? Quais?" },
+    { id: "2", question: "Apresenta alergia a medicamentos? Quais?" },
+    { id: "3", question: "Pressão alta?" },
+    { id: "4", question: "Está sob cuidados médicos? Por quê?" },
+    { id: "5", question: "Quando fez seu último tratamento dentário?" },
+    { id: "6", question: "Range os dentes à noite?" },
+    { id: "7", question: "Complicações em tratamentos anteriores?" },
+    { id: "8", question: "Tem sinusite?" },
+    { id: "9", question: "Sua pressão sanguínea é alta?" },
+    { id: "10", question: "Toma ASS?" },
+    { id: "11", question: "Tem asma?" },
+    { id: "12", question: "Tem alguma alergia?" },
+    { id: "13", question: "Já teve alguma reação com anestésicos?" },
+    { id: "14", question: "Tem algum diabético em sua família?" },
+    { id: "15", question: "Costuma desmaiar com frequência?" },
+    { id: "16", question: "Considera-se nervoso(a)?" },
+    { id: "17", question: "A senhora está grávida?" }
+  ];
+
+  const [catalogOptions, setCatalogOptions] = useState<{
+    professionals: any[];
+    convenios: any[];
+  }>({ professionals: [], convenios: [] });
 
   async function loadData() {
     try {
-      const [pRes, hRes] = await Promise.all([
+      const [pRes, hRes, cRes] = await Promise.all([
         fetch(`/api/pacientes/${id}`),
-        fetch(`/api/pacientes/${id}/historico`)
+        fetch(`/api/pacientes/${id}/historico`),
+        fetch('/api/catalogo')
       ]);
       const pData = await pRes.json();
       const hData = await hRes.json();
+      const cData = await cRes.json();
+
+      setCatalogOptions({
+        professionals: cData.professionals || [],
+        convenios: cData.convenios || []
+      });
       
-      const defaultAnamnesis = [
-        { id: "2", question: "Alergia a medicamentos? Quais?", alert: null, complement: "" },
-        { id: "1", question: "Usa Medicamentos? Quais?", alert: null, complement: "" },
-        { id: "3", question: "Pressão alta?", alert: null, complement: "" },
-        { id: "11", question: "Tem asma?", alert: null, complement: "" },
-        { id: "13", question: "Reação com anestésicos?", alert: null, complement: "" },
-        { id: "6", question: "Bruxismo (ranger dentes)?", alert: null, complement: "" },
-        { id: "17", question: "Está grávida?", alert: null, complement: "" },
-        { id: "8", question: "Tem sinusite?", alert: null, complement: "" }
-      ];
+      const defaultAnamnesis = initialAnamnesisQuestions.map(q => ({
+        ...q,
+        id_qst_item: q.id,
+        alert: null,
+        complement: "",
+        responseId: "0"
+      }));
+
+      // Merge existing anamnesis from DB with our default list to ensure all questions are shown
+      const mergedAnamnesis = defaultAnamnesis.map(dq => {
+        const existing = pData.anamnesis?.find((ea: any) => ea.question === dq.question);
+        return existing ? { ...dq, ...existing } : dq;
+      });
 
       const patientWithAnamnesis = {
         ...pData,
-        anamnesis: (pData.anamnesis && pData.anamnesis.length > 0) ? pData.anamnesis : defaultAnamnesis
+        anamnesis: mergedAnamnesis
       };
 
       setPatient(patientWithAnamnesis);
@@ -1026,89 +1082,198 @@ function PatientProfileContent() {
           {/* Tab Content: Dados Pessoais */}
           {activeTab === "dados" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="bg-white rounded-[32px] border border-slate-200 p-8 shadow-sm">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CPF</p>
-                    <input 
-                      type="text"
-                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                      value={patientEditForm?.cpf || ""}
-                      onChange={(e) => setPatientEditForm({ ...patientEditForm, cpf: maskCPF(e.target.value) })}
-                    />
+              <div className="bg-white rounded-[32px] border border-slate-200 p-8 shadow-sm space-y-8">
+                {/* Informações Básicas */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-blue-600 rounded-full" />
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identificação</h4>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">RG</p>
-                    <input 
-                      type="text"
-                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                      value={patientEditForm?.rg || ""}
-                      onChange={(e) => setPatientEditForm({ ...patientEditForm, rg: maskRG(e.target.value) })}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nascimento</p>
-                    <input 
-                      type="date"
-                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                      value={patientEditForm?.birthDate ? new Date(patientEditForm.birthDate).toISOString().split('T')[0] : ""}
-                      onChange={(e) => setPatientEditForm({ ...patientEditForm, birthDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="col-span-full">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Endereço Residencial</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 bg-slate-50/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all">
-                        <MapPin size={16} className="text-blue-500" />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="col-span-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Apelido / Como prefere ser chamado</p>
                         <input 
-                          type="text"
-                          placeholder="Rua, Número, Complemento"
-                          className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-slate-700 focus:ring-0"
-                          value={patientEditForm?.address || ""}
-                          onChange={(e) => setPatientEditForm({ ...patientEditForm, address: e.target.value })}
+                        type="text"
+                        className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                        value={patientEditForm?.nickname || ""}
+                        onChange={(e) => setPatientEditForm({ ...patientEditForm, nickname: e.target.value })}
                         />
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sexo</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.sex || "2"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, sex: e.target.value })}
+                        >
+                            {genders.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estado Civil</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.maritalStatus || "6"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, maritalStatus: e.target.value })}
+                        >
+                            {maritalStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CPF</p>
                         <input 
-                          type="text"
-                          placeholder="Bairro"
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                          value={patientEditForm?.neighborhood || ""}
-                          onChange={(e) => setPatientEditForm({ ...patientEditForm, neighborhood: e.target.value })}
+                        type="text"
+                        className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                        value={patientEditForm?.cpf || ""}
+                        onChange={(e) => setPatientEditForm({ ...patientEditForm, cpf: maskCPF(e.target.value) })}
                         />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">RG</p>
                         <input 
-                          type="text"
-                          placeholder="Cidade"
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                          value={patientEditForm?.city || ""}
-                          onChange={(e) => setPatientEditForm({ ...patientEditForm, city: e.target.value })}
+                        type="text"
+                        className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                        value={patientEditForm?.rg || ""}
+                        onChange={(e) => setPatientEditForm({ ...patientEditForm, rg: maskRG(e.target.value) })}
                         />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nascimento</p>
                         <input 
-                          type="text"
-                          placeholder="UF"
-                          maxLength={2}
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                          value={patientEditForm?.state || ""}
-                          onChange={(e) => setPatientEditForm({ ...patientEditForm, state: e.target.value })}
+                        type="date"
+                        className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                        value={patientEditForm?.birthDate ? new Date(patientEditForm.birthDate).toISOString().split('T')[0] : ""}
+                        onChange={(e) => setPatientEditForm({ ...patientEditForm, birthDate: e.target.value })}
                         />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Profissão</p>
                         <input 
-                          type="text"
-                          placeholder="CEP"
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                          value={patientEditForm?.zipCode || ""}
-                          onChange={(e) => setPatientEditForm({ ...patientEditForm, zipCode: e.target.value })}
+                        type="text"
+                        className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                        value={patientEditForm?.profession || ""}
+                        onChange={(e) => setPatientEditForm({ ...patientEditForm, profession: e.target.value })}
                         />
-                      </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Profissão</p>
-                    <input 
-                      type="text"
-                      className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
-                      value={patientEditForm?.profession || ""}
-                      onChange={(e) => setPatientEditForm({ ...patientEditForm, profession: e.target.value })}
-                    />
+                </div>
+
+                {/* Localização */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-emerald-500 rounded-full" />
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Localização</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-4">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Endereço</p>
+                        <div className="flex items-center gap-2 bg-slate-50/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all">
+                            <MapPin size={16} className="text-blue-500" />
+                            <input 
+                            type="text"
+                            placeholder="Rua, Número, Complemento"
+                            className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-slate-700 focus:ring-0"
+                            value={patientEditForm?.address || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, address: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <div className="md:col-span-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bairro</p>
+                        <input 
+                            type="text"
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.neighborhood || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, neighborhood: e.target.value })}
+                        />
+                    </div>
+                    <div className="md:col-span-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CEP</p>
+                        <input 
+                            type="text"
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.zipCode || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, zipCode: e.target.value })}
+                        />
+                    </div>
+                    <div className="md:col-span-3">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cidade</p>
+                        <input 
+                            type="text"
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.city || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, city: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">UF</p>
+                        <input 
+                            type="text"
+                            maxLength={2}
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none text-center"
+                            value={patientEditForm?.state || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, state: e.target.value.toUpperCase() })}
+                        />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Atendimento */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-purple-500 rounded-full" />
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Configurações de Atendimento</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Convênio</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.convenioId || "1"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, convenioId: e.target.value })}
+                        >
+                            {catalogOptions.convenios.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matrícula</p>
+                        <input 
+                            type="text"
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.registrationNumber || ""}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, registrationNumber: e.target.value })}
+                        />
+                    </div>
+                    <div className="col-span-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Dentista Preferencial</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.preferredProfessionalId || "1"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, preferredProfessionalId: e.target.value })}
+                        >
+                            {catalogOptions.professionals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Indicação</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.referralTypeId || "3"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, referralTypeId: e.target.value })}
+                        >
+                            {referralTypes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status do Paciente</p>
+                        <select 
+                            className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
+                            value={patientEditForm?.status || "2"}
+                            onChange={(e) => setPatientEditForm({ ...patientEditForm, status: e.target.value })}
+                        >
+                            {patientStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1120,11 +1285,11 @@ function PatientProfileContent() {
                     <HeartPulse size={20} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Ficha de Saúde</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alertas e Informações Clínicas</p>
+                    <h3 className="font-bold text-slate-900">Ficha de Saúde (Anamnese Completa)</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Respostas integradas ao banco de dados</p>
                   </div>
                 </div>
-                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                   {patientEditForm?.anamnesis?.length > 0 ? (
                     patientEditForm.anamnesis.map((item: any, idx: number) => (
                       <div key={idx} className={cn(
@@ -1138,23 +1303,35 @@ function PatientProfileContent() {
                           {item.responseId === '2' ? <AlertTriangle size={20} /> : <Stethoscope size={20} />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                            {item.question}
-                          </p>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+                                {item.question}
+                            </p>
+                            <input 
+                                type="checkbox" 
+                                checked={item.responseId === '2'} 
+                                onChange={(e) => {
+                                    const newAnamnesis = [...patientEditForm.anamnesis];
+                                    newAnamnesis[idx].responseId = e.target.checked ? '2' : '0';
+                                    setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
+                                }}
+                                className="w-3 h-3 accent-blue-600 shrink-0 mt-0.5"
+                            />
+                          </div>
                           <textarea 
-                            rows={1}
+                            rows={4}
                             className={cn(
-                              "w-full bg-transparent border-none p-0 text-sm font-bold leading-snug focus:ring-0 resize-none outline-none",
-                              item.responseId === '2' ? "text-rose-700" : "text-slate-700"
+                              "w-full bg-white/50 border border-slate-100 rounded-lg p-2 mt-2 text-xs font-bold leading-relaxed focus:ring-2 focus:ring-blue-500/10 resize-none outline-none transition-all",
+                              item.responseId === '2' ? "text-rose-700 placeholder:text-rose-300 border-rose-100" : "text-slate-700 placeholder:text-slate-300"
                             )}
                             value={item.alert || item.complement || ""}
                             onChange={(e) => {
                                 const newAnamnesis = [...patientEditForm.anamnesis];
-                                if (item.alert !== null) newAnamnesis[idx].alert = e.target.value;
-                                else newAnamnesis[idx].complement = e.target.value;
+                                newAnamnesis[idx].complement = e.target.value;
+                                newAnamnesis[idx].alert = e.target.value; 
                                 setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
                             }}
-                            placeholder="Adicionar observação..."
+                            placeholder="Descreva aqui..."
                           />
                         </div>
                       </div>

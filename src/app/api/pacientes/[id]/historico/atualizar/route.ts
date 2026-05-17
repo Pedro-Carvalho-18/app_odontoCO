@@ -80,7 +80,7 @@ export async function POST(
               nextId.toString(),
               patientId,
               today,
-              `Pagamento Parcela ${currentInstallmentNumber}/${totalInst} - ${procName}`,
+              `Pg ${procName} (Parc ${currentInstallmentNumber}/${totalInst})`,
               valPerInst.toFixed(2),
               now,
               today,

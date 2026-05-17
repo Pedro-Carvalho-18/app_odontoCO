@@ -16,29 +16,36 @@ export async function POST(request: Request) {
     // 2. Inserir na tabela PESSOAL
     await db.run(
       `INSERT INTO PESSOAL (
-        NROPAC, PRINOM, EMAIL, FONE1, DATNAS, CIC, RG, 
+        NROPAC, PRINOM, APELIDO, EMAIL, FONE1, DATNAS, SEXO, ESTCIVIL, CIC, RG, 
         ENDRES, BAIRES, CIDRES, ESTRES, CEPRES, PROFIS,
-        DATCAD, USER_STAMP_INS, TIME_STAMP_INS, ID_PRESTADOR, STATUS, ID_UNIDADE
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ID_CONVENIO, MATRICULA, ID_PRESTADOR, TIPO_INDICA, STATUS,
+        DATCAD, USER_STAMP_INS, TIME_STAMP_INS, ID_UNIDADE
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         nextId.toString(),
         body.name,
+        body.nickname || null,
         body.email || null,
         body.phone || null,
         body.birthDate || null,
+        body.sex || "2",
+        body.maritalStatus || "6",
         body.cpf || null,
         body.rg || null,
         body.address || null,
         body.neighborhood || null,
-        body.city || null,
-        body.state || null,
+        body.city || "ARARAQUARA",
+        body.state || "SP",
         body.zipCode || null,
         body.profession || null,
+        body.convenioId || "1",
+        body.registrationNumber || null,
+        body.preferredProfessionalId || "1",
+        body.referralTypeId || "3",
+        body.status || "2",
         today,
         "SISTEMA",
         now,
-        "1",
-        "1",
         "1"
       ]
     );

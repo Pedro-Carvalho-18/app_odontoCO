@@ -713,7 +713,16 @@ export default function PatientRecordPage() {
            <div className="flex-1 relative overflow-hidden flex items-center">
               <button onClick={() => scrollHistory('left')} className="absolute left-2 z-10 p-2 bg-white/80 shadow-lg rounded-full hover:bg-white transition-all"><ChevronLeft size={20} /></button>
               <button onClick={() => scrollHistory('right')} className="absolute right-2 z-10 p-2 bg-white/80 shadow-lg rounded-full hover:bg-white transition-all"><ChevronRight size={20} /></button>
-              <div ref={scrollContainerRef} className="flex-1 overflow-x-auto p-5 flex gap-4 scroll-smooth hide-scrollbar px-10">
+              <div 
+                ref={scrollContainerRef} 
+                className="flex-1 overflow-x-auto p-5 flex gap-4 scroll-smooth px-10"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                <style jsx>{`
+                  div::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
                  {history.filter(h => !h.procedure.includes("Alteração Odontograma")).map((item, idx) => (
                    <div key={idx} onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} className="w-60 shrink-0 p-4 rounded-3xl border border-slate-100 bg-white flex flex-col gap-2 hover:shadow-xl transition-all cursor-pointer">
                       <div className="flex justify-between items-start">
