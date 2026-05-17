@@ -202,14 +202,34 @@ export default function PatientRecordPage() {
   });
   const [prescriptionItems, setPrescriptionItems] = useState<any[]>([]);
   const [finalPrescriptionText, setFinalPrescriptionText] = useState("");
-  const [medicationsDB, setMedicationsDB] = useState<{ code: number; name: string }[]>([]);
+  const [medicationsDB, setMedicationsDB] = useState<{ 
+    code: number; 
+    name: string;
+    posologyAdult?: string;
+    quantityAdult?: string;
+    posologyChild?: string;
+    quantityChild?: string;
+    usage?: string;
+  }[]>([]);
+
+  const handleMedicationSelect = (med: any, type: string = prescriptionForm.type) => {
+    setPrescriptionForm({
+      ...prescriptionForm,
+      medication: med.name,
+      type: type,
+      quantity: type === "Adulto" ? (med.quantityAdult || "") : (med.quantityChild || ""),
+      usage: med.usage || "",
+      observations: type === "Adulto" ? (med.posologyAdult || "") : (med.posologyChild || "")
+    });
+    setShowMedicationSearch(false);
+  };
 
   useEffect(() => {
     async function loadCatalog() {
       try {
         const [catRes, medRes] = await Promise.all([
             fetch('/api/catalogo', { cache: 'no-store' }),
-            fetch('/api/medicamentos')
+            fetch('/api/medicamentos', { cache: 'no-store' })
         ]);
         const catalogData = await catRes.json();
         const medsData = await medRes.json();
@@ -932,8 +952,8 @@ export default function PatientRecordPage() {
             </div>
             
             {prescriptionStep === 'assistant' && (
-               <div className="flex-1 overflow-hidden flex items-center justify-center bg-slate-100 p-2">
-                  <div className="w-full max-w-2xl max-h-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+               <div className="flex-1 overflow-hidden flex items-center justify-center bg-slate-100">
+                  <div className="w-full h-full bg-white shadow-xl overflow-hidden flex flex-col">
                      <div className="p-4 space-y-3 overflow-y-auto custom-scrollbar flex-1">
                         <div className="grid grid-cols-2 gap-3">
                            <div className="space-y-1">
@@ -967,17 +987,27 @@ export default function PatientRecordPage() {
                         <div className="space-y-1 relative">
                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Medicamento</label>
                            <div className="flex gap-2">
-                              <input 
-                                 type="text" 
-                                 value={prescriptionForm.medication} 
-                                 onChange={(e) => {
-                                    setPrescriptionForm({...prescriptionForm, medication: e.target.value});
-                                    if (!showMedicationSearch) setShowMedicationSearch(true);
-                                 }}
-                                 onFocus={() => setShowMedicationSearch(true)}
-                                 className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none" 
-                                 placeholder="Buscar..."
-                              />
+                              <div className="flex-1 relative">
+                                 <input 
+                                    type="text" 
+                                    value={prescriptionForm.medication} 
+                                    onChange={(e) => {
+                                       setPrescriptionForm({...prescriptionForm, medication: e.target.value});
+                                       if (!showMedicationSearch) setShowMedicationSearch(true);
+                                    }}
+                                    onFocus={() => setShowMedicationSearch(true)}
+                                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none pr-8" 
+                                    placeholder="Buscar..."
+                                 />
+                                 {prescriptionForm.medication && (
+                                    <button 
+                                       onClick={() => setPrescriptionForm({...prescriptionForm, medication: "", quantity: "", usage: "", observations: ""})}
+                                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
+                                    >
+                                       <X size={14} />
+                                    </button>
+                                 )}
+                              </div>
                               <button onClick={() => setShowMedicationSearch(!showMedicationSearch)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
                                  <Search size={16} />
                               </button>
@@ -988,10 +1018,7 @@ export default function PatientRecordPage() {
                                  {medicationsDB.filter(m => normalizeString(m.name).includes(normalizeString(prescriptionForm.medication))).map(med => (
                                     <button 
                                        key={med.code} 
-                                       onClick={() => {
-                                          setPrescriptionForm({...prescriptionForm, medication: med.name});
-                                          setShowMedicationSearch(false);
-                                       }}
+                                       onClick={() => handleMedicationSelect(med)}
                                        className="w-full text-left p-1.5 hover:bg-blue-50 text-[10px] font-bold border-b border-slate-50 last:border-0"
                                     >
                                        {med.name}
@@ -1005,8 +1032,16 @@ export default function PatientRecordPage() {
                            <div className="w-1/4 space-y-1">
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Prescrição</label>
                               <div className="flex flex-col gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                                 <label className="flex items-center gap-2 text-[10px] font-bold cursor-pointer"><input type="radio" name="rx_type" checked={prescriptionForm.type === "Adulto"} onChange={() => setPrescriptionForm({...prescriptionForm, type: "Adulto"})} className="w-3 h-3" /> Adulto</label>
-                                 <label className="flex items-center gap-2 text-[10px] font-bold cursor-pointer"><input type="radio" name="rx_type" checked={prescriptionForm.type === "Criança"} onChange={() => setPrescriptionForm({...prescriptionForm, type: "Criança"})} className="w-3 h-3" /> Criança</label>
+                                 <label className="flex items-center gap-2 text-[10px] font-bold cursor-pointer"><input type="radio" name="rx_type" checked={prescriptionForm.type === "Adulto"} onChange={() => {
+                                    const med = medicationsDB.find(m => m.name === prescriptionForm.medication);
+                                    if (med) handleMedicationSelect(med, "Adulto");
+                                    else setPrescriptionForm({...prescriptionForm, type: "Adulto"});
+                                 }} className="w-3 h-3" /> Adulto</label>
+                                 <label className="flex items-center gap-2 text-[10px] font-bold cursor-pointer"><input type="radio" name="rx_type" checked={prescriptionForm.type === "Criança"} onChange={() => {
+                                    const med = medicationsDB.find(m => m.name === prescriptionForm.medication);
+                                    if (med) handleMedicationSelect(med, "Criança");
+                                    else setPrescriptionForm({...prescriptionForm, type: "Criança"});
+                                 }} className="w-3 h-3" /> Criança</label>
                               </div>
                            </div>
                            <div className="flex-1 grid grid-cols-2 gap-3">
