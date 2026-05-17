@@ -36,6 +36,8 @@ export async function POST(
     const tipo = formData.get("tipo") || "outros";
     const observacao = formData.get("observacao") || "";
 
+    console.log("Upload File POST API called:", { nropac, nroIntPac, nroTra, tipo, fileName: file?.name });
+
     if (!file) {
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
     }
