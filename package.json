@@ -13,7 +13,7 @@
   },
   "build": {
     "appId": "com.odonto.app",
-    "productName": "Easy Odonto",
+    "productName": "OdontoCO",
     "files": [
       "out/**/*",
       "main.js",
