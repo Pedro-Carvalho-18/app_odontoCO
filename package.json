@@ -7,29 +7,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "eslint",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "dist": "set CSC_SKIP_SIGN=true && npm run build && electron-builder --win",
+    "dist": "npm run build && cross-env CSC_SKIP_SIGN=true electron-builder --win",
     "clean-cache": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force $env:LOCALAPPDATA\\electron-builder\\Cache\""
-    },
-    "build": {
+  },
+  "build": {
     "appId": "com.odonto.app",
     "productName": "OdontoCO",
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "Imagens/AppIcone.png",
-      "publish": null
+      "forceCodeSigning": false,
+      "signingHashAlgorithms": []
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "OdontoCO"
-    },
-    "directories": {
-      "signingHashAlgorithms": []
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
     },
     "directories": {
       "output": "dist"
@@ -56,6 +54,7 @@
     "electron": "^41.6.1",
     "electron-builder": "^26.8.1",
     "electron-builder-squirrel-windows": "^26.8.1",
+    "electron-packager": "^17.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
     "tailwindcss": "^4",
