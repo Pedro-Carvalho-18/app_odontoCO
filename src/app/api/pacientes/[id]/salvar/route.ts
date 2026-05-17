@@ -15,6 +15,9 @@ const statusMap: Record<string, string> = {
   caries: 'arc_CARIE',
   restoration: 'arc_FIXA1',
   prosthesis: 'arc_IMPLANTE',
+  // Legacy support for reconstruction
+  ausente: 'arc_EXTRACAO_s',
+  extracao: 'arc_EXTRACAO_s'
 };
 
 export async function POST(
@@ -54,7 +57,7 @@ export async function POST(
           const now = new Date().toISOString().replace('T', ' ').split('.')[0].replace('Z', '') + '.000';
           const today = new Date().toISOString().split('T')[0];
 
-          const lastTraRow = await db.get("SELECT MAX(CAST(NROTRA AS INTEGER)) as id FROM CCPACIENTE");
+          const lastTraRow = await db.get("SELECT MAX(CAST(NROTRA AS INTEGER)) as id FROM INTERVENCAO");
           const nextTraId = (Number(lastTraRow?.id) || 0) + 1;
 
           await db.run(
@@ -80,62 +83,67 @@ export async function POST(
           );
 
           // FINANCIAL INTEGRATION: Create debt and payment in CCPACIENTE
-          if (inter.numericValue > 0) {
-            // 1. Create DEBT record (NROLAN '4')
-            const lastCcRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
-            const nextCcId = (Number(lastCcRow?.id) || 0) + 1;
+          // Only for real clinical procedures with value
+          if (inter.numericValue > 0 && !inter.procedure?.includes("Alteração Odontograma")) {
+            const instCount = Math.max(1, parseInt(inter.installments) || 1);
+            const rawValue = parseFloat(inter.numericValue) || 0;
+            const valPerInst = rawValue / instCount;
 
-            await db.run(
-              `INSERT INTO CCPACIENTE (
-                REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-                USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
-              ) VALUES (?, ?, ?, ?, '4', '255', ?, ?, ?, ?, ?)`,
-              [
-                nextCcId.toString(),
-                patientId,
-                formattedDate,
-                `LANÇAMENTO: ${inter.procedure}`,
-                inter.numericValue.toString(),
-                "SISTEMA",
-                now,
-                today + " 00:00:00.000",
-                nextTraId.toString()
-              ]
-            );
+            // 1. Create DEBT records (NROLAN '4') - One for each installment
+            for (let i = 1; i <= instCount; i++) {
+              const lastCcRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+              const nextCcId = (Number(lastCcRow?.id) || 0) + 1;
 
-            // 2. Create PAYMENT record if payment method is provided (NROLAN '6') and isPaid is true
-            // Assume the first installment is paid if installments > 1, or the whole thing if 1x
-            if (inter.isPaid && inter.paymentMethodId && inter.paymentMethodId !== 'none') {
-               const lastPayRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
-               const nextPayId = (Number(lastPayRow?.id) || 0) + 1;
-               
-               const instCount = Math.max(1, parseInt(inter.installments) || 1);
-               const rawValue = parseFloat(inter.numericValue) || 0;
-               const payValue = rawValue / instCount;
+              await db.run(
+                `INSERT INTO CCPACIENTE (
+                  REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                  USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+                ) VALUES (?, ?, ?, ?, '4', '255', ?, ?, ?, ?, ?, ?)`,
+                [
+                  nextCcId.toString(),
+                  patientId,
+                  formattedDate,
+                  `LANÇAMENTO: ${inter.procedure} (Parc ${i}/${instCount})`,
+                  valPerInst.toFixed(2),
+                  "SISTEMA",
+                  now,
+                  today + " 00:00:00.000",
+                  nextTraId.toString(),
+                  i.toString()
+                ]
+              );
 
-               await db.run(
-                 `INSERT INTO CCPACIENTE (
-                   REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-                   TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
-                 ) VALUES (?, ?, ?, ?, '6', '255', ?, ?, ?, ?, ?, ?)`,
-                 [
-                   nextPayId.toString(),
-                   patientId,
-                   formattedDate,
-                   `PAGTO: ${inter.procedure} (${instCount === 1 ? 'Total' : 'Parc 1/' + instCount})`,
-                   payValue.toFixed(2),
-                   inter.paymentMethodId,
-                   "SISTEMA",
-                   now,
-                   today + " 00:00:00.000",
-                   nextTraId.toString()
-                 ]
-               );
+              // 2. Create PAYMENT record if payment method is provided (NROLAN '6') and isPaid is true
+              if (i === 1 && inter.isPaid && inter.paymentMethodId && inter.paymentMethodId !== 'none') {
+                 const lastPayRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+                 const nextPayId = (Number(lastPayRow?.id) || 0) + 1;
+                 
+                 await db.run(
+                   `INSERT INTO CCPACIENTE (
+                     REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                     TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+                   ) VALUES (?, ?, ?, ?, '6', '255', ?, ?, ?, ?, ?, ?, ?)`,
+                   [
+                     nextPayId.toString(),
+                     patientId,
+                     formattedDate,
+                     `PAGTO: ${inter.procedure} (Parc 1/${instCount})`,
+                     valPerInst.toFixed(2),
+                     inter.paymentMethodId,
+                     "SISTEMA",
+                     now,
+                     today + " 00:00:00.000",
+                     nextTraId.toString(),
+                     "1"
+                   ]
+                 );
+              }
             }
           }
 
           const toothNum = parseInt(inter.tooth);
           if (!isNaN(toothNum) && inter.toothData) {
+            console.log(`[SAVE] Saving tooth ${toothNum} with status: ${inter.toothData.status}`);
             const internalId = getInternalToothId(toothNum);
             const status = inter.toothData.status;
             let bitmap = statusMap[status] || '';
@@ -144,7 +152,7 @@ export async function POST(
               bitmap = `${bitmap}_${toothNum}`;
             }
 
-            console.log(`[SAVE] Inserting DENTE: PAC=${patientId}, INTPAC=${nextNroIntPac}, DEN=${internalId}, BITMAP=${bitmap}`);
+            console.log(`[SAVE] Inserting DENTE: PAC=${patientId}, INTPAC=${nextNroIntPac}, DEN=${internalId}, BITMAP="${bitmap}"`);
             
             await db.run(
               "INSERT INTO DENTE (NROPAC, NROINTPAC, NRODEN, BITMAP) VALUES (?, ?, ?, ?)",

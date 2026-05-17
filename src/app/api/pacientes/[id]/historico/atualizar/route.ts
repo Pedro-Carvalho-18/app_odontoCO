@@ -13,7 +13,23 @@ export async function POST(
     const db = await getDb();
 
     if (type === 'intervention') {
-      const statusValue = status === 'Concluído' ? '2' : status === 'Cancelado' ? '3' : '1';
+      const totalInst = Number(body.totalInstallments || body.installments || 1);
+      let finalPaidInst = paidInstallments !== undefined ? Number(paidInstallments) : undefined;
+      let finalStatus = status;
+
+      // Synchronization logic:
+      // 1. If status is Concluído, ensure all installments are marked as paid
+      if (finalStatus === 'Concluído' && (finalPaidInst === undefined || finalPaidInst < totalInst)) {
+        finalPaidInst = totalInst;
+      }
+      
+      // 2. If all installments are paid, ensure status is Concluído
+      if (finalPaidInst !== undefined && finalPaidInst >= totalInst) {
+        finalStatus = 'Concluído';
+        finalPaidInst = totalInst; // Cap it
+      }
+
+      const statusValue = finalStatus === 'Concluído' ? '2' : finalStatus === 'Cancelado' ? '3' : '1';
 
       // Ler estado atual para saber se parcelas foram adicionadas
       const current = await db.get(`SELECT ORCAMENTO, NROTRA FROM INTERVENCAO WHERE NROINTPAC = ? AND NROPAC = ?`, [id, patientId]);
@@ -27,16 +43,15 @@ export async function POST(
              STATUS = ?,
              ORCAMENTO = ?
          WHERE NROPAC = ? AND NROINTPAC = ?`,
-        [professionalId, value, statusValue, paidInstallments !== undefined ? String(paidInstallments) : null, patientId, id]
+        [professionalId, value, statusValue, finalPaidInst !== undefined ? String(finalPaidInst) : null, patientId, id]
       );
 
-      // Gerar registro financeiro na conta do paciente (CCPACIENTE) se houver novas parcelas pagas
-      if (paidInstallments !== undefined && paidInstallments > oldPaidInst) {
-        const totalInst = Number(body.totalInstallments || body.installments || 1);
+      // Gerar registro financeiro na conta do paciente (CCPACIENTE) se houver novas parcelas pagas e valor > 0
+      if (finalPaidInst !== undefined && finalPaidInst > oldPaidInst && Number(value) > 0 && !procedure?.includes("Alteração Odontograma")) {
         const valPerInst = (Number(value) || 0) / totalInst;
-        const diff = paidInstallments - oldPaidInst;
+        const diff = finalPaidInst - oldPaidInst;
         
-        console.log(`[FINANCE] Adding ${diff} installments for patient ${patientId}. Range: ${oldPaidInst + 1} to ${paidInstallments}`);
+        console.log(`[FINANCE] Adding ${diff} installments for patient ${patientId}. Range: ${oldPaidInst + 1} to ${finalPaidInst}`);
 
         for (let i = 1; i <= diff; i++) {
           const currentInstallmentNumber = oldPaidInst + i;
@@ -59,8 +74,8 @@ export async function POST(
           await db.run(
             `INSERT INTO CCPACIENTE (
               REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-              TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
-            ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?)`,
+              TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+            ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?, ?)`,
             [
               nextId.toString(),
               patientId,
@@ -69,7 +84,8 @@ export async function POST(
               valPerInst.toFixed(2),
               now,
               today,
-              interTraId.toString()
+              interTraId.toString(),
+              currentInstallmentNumber.toString()
             ]
           );
         }

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { nroTra, nroPac, value, description } = await request.json();
+    const { nroTra, nroPac, nroPar, value, description } = await request.json();
     const db = await getDb();
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     const today = new Date().toISOString().split('T')[0];
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       `INSERT INTO CCPACIENTE (
         REGISTRO, NROPAC, NROTRA, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
         TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROPAR
-      ) VALUES (?, ?, ?, ?, ?, '6', '255', ?, '1', 'SISTEMA', ?, ?, '81')`,
+      ) VALUES (?, ?, ?, ?, ?, '6', '255', ?, '1', 'SISTEMA', ?, ?, ?)`,
       [
         nextId.toString(),
         nroPac,
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
         description || "Pg Tratamento",
         value.toString(),
         now,
-        today + " 00:00:00.000"
+        today + " 00:00:00.000",
+        nroPar || "1"
       ]
     );
 

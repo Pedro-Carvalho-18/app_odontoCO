@@ -788,22 +788,19 @@ function PatientProfileContent() {
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total em Tratamentos</p>
                   <h4 className="text-2xl font-black text-slate-900">
-                    R$ {history?.interventions.reduce((acc, curr) => acc + (curr.value || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(history as any)?.financialSummary?.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
                   </h4>
                 </div>
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pago</p>
                   <h4 className="text-2xl font-black text-emerald-600">
-                    R$ {history?.interventions.reduce((acc, curr) => acc + (Number(curr.totalPaid) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(history as any)?.financialSummary?.totalPaid?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
                   </h4>
                 </div>
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Devedor</p>
                   <h4 className="text-2xl font-black text-rose-600">
-                    R$ {(
-                      history?.interventions.reduce((acc, curr) => acc + (curr.value || 0), 0) -
-                      history?.interventions.reduce((acc, curr) => acc + (Number(curr.totalPaid) || 0), 0)
-                    ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(history as any)?.financialSummary?.balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
                   </h4>
                 </div>
               </div>

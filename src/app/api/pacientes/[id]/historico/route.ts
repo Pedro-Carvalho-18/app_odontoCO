@@ -80,7 +80,8 @@ export async function GET(
         DF.BITMAP as dentalStatus,
         DF.NRODEN as internalToothId,
         DF.FACE1, DF.FACE2, DF.FACE3, DF.FACE4, DF.FACE5,
-        COALESCE(FIN.totalPaid, 0) as totalPaid
+        COALESCE(FIN.totalPaid, 0) as totalPaid,
+        COALESCE(VTRA.totalValue, CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT)) as totalTraValue
       FROM INTERVENCAO I
       LEFT JOIN TRATAMENTO TR ON I.NROTRA = TR.NROTRA
       LEFT JOIN TAB_GEN_ITEM T ON I.NROINT = T.ID_PRC_GEN
@@ -94,7 +95,14 @@ export async function GET(
         GROUP BY NROTRA
       ) FIN ON I.NROTRA = FIN.NROTRA
       LEFT JOIN (
-        SELECT NROPAC, NROINTPAC, NRODEN, MAX(BITMAP) as BITMAP, MAX(FACE1) as FACE1, MAX(FACE2) as FACE2, MAX(FACE3) as FACE3, MAX(FACE4) as FACE4, MAX(FACE5) as FACE5
+        SELECT NROTRA, SUM(CAST(VALOR_PACIENTE AS FLOAT)) as totalValue
+        FROM INTERVENCAO
+        GROUP BY NROTRA
+      ) VTRA ON I.NROTRA = VTRA.NROTRA
+      LEFT JOIN (
+        SELECT NROPAC, NROINTPAC, NRODEN, 
+          GROUP_CONCAT(BITMAP) as BITMAP, 
+          MAX(FACE1) as FACE1, MAX(FACE2) as FACE2, MAX(FACE3) as FACE3, MAX(FACE4) as FACE4, MAX(FACE5) as FACE5
         FROM (
           SELECT NROPAC, NROINTPAC, NRODEN, BITMAP, NULL as FACE1, NULL as FACE2, NULL as FACE3, NULL as FACE4, NULL as FACE5 FROM DENTE
           UNION ALL
@@ -107,32 +115,127 @@ export async function GET(
     );
 
     // After fetching, calculate paidInstallments in JS for more flexibility
-    const processedInterventions = interventions.map(inter => {
-      const totalVal = parseFloat(inter.value) || 0;
-      
-      // Extract total installments from notes if not elsewhere
+    const processedInterventions = interventions
+      .filter(inter => !inter.procedure?.includes("Alteração Odontograma"))
+      .map(inter => {
+      // 1. Determine total installments
       let totalInst = 1;
       if (inter.notes && inter.notes.includes('(') && inter.notes.includes('x)')) {
          const match = inter.notes.match(/\((\d+)x\)/);
          if (match) totalInst = parseInt(match[1]) || 1;
+      } else if (inter.installments) {
+         totalInst = parseInt(inter.installments) || 1;
       }
 
-      const valPerInst = totalVal / totalInst;
+      // 2. Calculate paid installments based on treatment progress
       const totalPaid = parseFloat(inter.totalPaid) || 0;
+      const totalTraValue = parseFloat(inter.totalTraValue) || 0;
       
-      // paidInstallments = Math.round(totalPaid / valPerInst)
-      const paidInst = valPerInst > 0 ? Math.round(totalPaid / valPerInst) : (totalPaid > 0 ? 1 : 0);
+      let paidInst = 0;
+      if (totalTraValue > 0) {
+        // Percentage of treatment paid
+        const progress = totalPaid / totalTraValue;
+        // Apply progress to installments
+        paidInst = Math.round(progress * totalInst);
+      } else if (totalPaid > 0) {
+        paidInst = totalInst;
+      }
+
+      // 3. Forced synchronization (Business logic requested by user)
+      let currentStatus = inter.status;
+      
+      // If it's fully paid (or almost fully paid), mark as Concluído
+      if (paidInst >= totalInst && totalInst > 0) {
+        paidInst = totalInst; // Cap it
+        currentStatus = 'Concluído';
+      }
+      
+      // If it's Concluído, ensure it shows as fully paid
+      if (currentStatus === 'Concluído') {
+        paidInst = totalInst;
+      }
 
       return {
         ...inter,
+        status: currentStatus,
         installments: totalInst.toString(),
         totalInstallments: totalInst,
         paidInstallments: paidInst
       };
     });
 
+    // 3. Get financial summary by treatment (NROTRA) for the balance calculation
+    // This avoids double-counting payments when multiple interventions share an NROTRA
+    const financialSummary = await db.all(
+      `SELECT 
+        I.NROTRA as nroTra,
+        SUM(DISTINCT CAST(IFNULL(FIN.totalPaid, 0) AS FLOAT)) as totalPaid,
+        SUM(CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT)) as totalValue
+      FROM INTERVENCAO I
+      LEFT JOIN (
+        SELECT NROTRA, SUM(CAST(VALOR AS FLOAT)) as totalPaid
+        FROM CCPACIENTE 
+        WHERE NROLAN IN ('6', '7', '8', '105')
+        GROUP BY NROTRA
+      ) FIN ON I.NROTRA = FIN.NROTRA
+      WHERE I.NROPAC = ? AND I.NROTRA IS NOT NULL AND I.NROTRA != '0'
+      GROUP BY I.NROTRA`,
+      [id]
+    );
+
+    // 4. Get consolidated current odontogram state
+    // We look for the absolute latest clinical record per tooth based on NROINTPAC
+    const clinicalState = await db.all(
+      `SELECT 
+        DF.NRODEN as internalToothId,
+        DF.BITMAP as dentalStatus,
+        DF.FACE1, DF.FACE2, DF.FACE3, DF.FACE4, DF.FACE5
+      FROM (
+        SELECT NROPAC, NRODEN, MAX(CAST(NROINTPAC AS INTEGER)) as latestId
+        FROM (
+          SELECT NROPAC, NRODEN, NROINTPAC FROM DENTE
+          UNION ALL
+          SELECT NROPAC, NRODEN, NROINTPAC FROM FACE
+        ) 
+        WHERE NROPAC = ?
+        GROUP BY NRODEN
+      ) LATEST
+      JOIN (
+        SELECT NROPAC, NROINTPAC, NRODEN, 
+          GROUP_CONCAT(BITMAP) as BITMAP, 
+          MAX(FACE1) as FACE1, MAX(FACE2) as FACE2, MAX(FACE3) as FACE3, MAX(FACE4) as FACE4, MAX(FACE5) as FACE5
+        FROM (
+          SELECT NROPAC, NROINTPAC, NRODEN, BITMAP, NULL as FACE1, NULL as FACE2, NULL as FACE3, NULL as FACE4, NULL as FACE5 FROM DENTE
+          UNION ALL
+          SELECT NROPAC, NROINTPAC, NRODEN, NULL as BITMAP, FACE1, FACE2, FACE3, FACE4, FACE5 FROM FACE
+        ) GROUP BY NROPAC, NROINTPAC, NRODEN
+      ) DF ON LATEST.NROPAC = DF.NROPAC AND LATEST.NRODEN = DF.NRODEN AND LATEST.latestId = CAST(DF.NROINTPAC AS INTEGER)`,
+      [id]
+    );
+
+    // Better summary calculation:
+    // Some interventions might not have NROTRA (unlikely but possible)
+    // We'll also get the sum of CC records directly for this patient
+    const directCcBalance = await db.get(
+      `SELECT 
+        SUM(CASE WHEN NROLAN IN ('4', '5') THEN CAST(VALOR AS FLOAT) ELSE 0 END) as totalCharges,
+        SUM(CASE WHEN NROLAN IN ('6', '7', '8', '105') THEN CAST(VALOR AS FLOAT) ELSE 0 END) as totalPayments
+      FROM CCPACIENTE 
+      WHERE NROPAC = ?`,
+      [id]
+    );
+
     await db.close();
-    return NextResponse.json({ history, interventions: processedInterventions });
+    return NextResponse.json({ 
+      history, 
+      interventions: processedInterventions,
+      clinicalState,
+      financialSummary: {
+        totalValue: directCcBalance?.totalCharges || 0,
+        totalPaid: directCcBalance?.totalPayments || 0,
+        balance: Math.max(0, (directCcBalance?.totalCharges || 0) - (directCcBalance?.totalPayments || 0))
+      }
+    });
   } catch (error: any) {
     console.error("API Error (History):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

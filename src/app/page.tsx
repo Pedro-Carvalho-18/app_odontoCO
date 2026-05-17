@@ -208,7 +208,7 @@ export default function PatientRecordPage() {
     async function loadCatalog() {
       try {
         const [catRes, medRes] = await Promise.all([
-            fetch('/api/catalogo'),
+            fetch('/api/catalogo', { cache: 'no-store' }),
             fetch('/api/medicamentos')
         ]);
         const catalogData = await catRes.json();
@@ -241,7 +241,7 @@ export default function PatientRecordPage() {
     setLoadingHistory(true);
     const pIdStr = String(patientId);
     try {
-      const res = await fetch(`/api/pacientes/${pIdStr}/historico`);
+      const res = await fetch(`/api/pacientes/${pIdStr}/historico`, { cache: 'no-store' });
       const data = await res.json();
       
       const combined = [
@@ -271,40 +271,36 @@ export default function PatientRecordPage() {
       });
 
       const newOdontogram = initialOdontogram();
-      // Processar do mais antigo para o mais novo para reconstruir o estado atual
-      [...normalized].reverse().forEach(item => {
-        let toothNum = parseInt(item.tooth);
-        if (isNaN(toothNum) && item.internalToothId) toothNum = getVisualToothNumber(parseInt(item.internalToothId));
-        if (isNaN(toothNum) || !newOdontogram[toothNum]) return;
-        
-        if (item.dentalStatus !== undefined && item.dentalStatus !== null) {
-          const status = String(item.dentalStatus).toLowerCase();
-          if (status.includes('extracao') || status.includes('ausente')) newOdontogram[toothNum].status = 'absent';
-          else if (status.includes('canal') || status.includes('bloco') || status.includes('coroa') || status.includes('fixa')) newOdontogram[toothNum].status = 'restoration';
-          else if (status.includes('implante') || status.includes('total') || status.includes('pontica')) newOdontogram[toothNum].status = 'prosthesis';
-          else if (status.includes('carie')) newOdontogram[toothNum].status = 'caries';
-          else if (status === '' || status === 'null') {
-             newOdontogram[toothNum].status = 'healthy';
+
+      // 1. Aplicar o estado clínico consolidado vindo da API (Estado Atual Real)
+      if (data.clinicalState && Array.isArray(data.clinicalState)) {
+        data.clinicalState.forEach((item: any) => {
+          const toothNum = getVisualToothNumber(parseInt(item.internalToothId));
+          if (!newOdontogram[toothNum]) return;
+
+          const status = String(item.dentalStatus || "").toLowerCase().trim();
+          
+          if (status.includes('extracao') || status.includes('ausente')) {
+            newOdontogram[toothNum].status = 'absent';
+          } else if (status.includes('canal') || status.includes('bloco') || status.includes('coroa') || status.includes('fixa')) {
+            newOdontogram[toothNum].status = 'restoration';
+          } else if (status.includes('implante') || status.includes('total') || status.includes('pontica')) {
+            newOdontogram[toothNum].status = 'prosthesis';
+          } else if (status.includes('carie')) {
+            newOdontogram[toothNum].status = 'caries';
+          } else {
+            newOdontogram[toothNum].status = 'healthy';
           }
-        }
-        
-        if (item.FACE1 !== undefined && item.FACE1 !== null) {
-          if (String(item.FACE1) === '-1') newOdontogram[toothNum].surfaces.top = true;
-          else if (String(item.FACE1) === '0') newOdontogram[toothNum].surfaces.top = false;
-          
-          if (String(item.FACE2) === '-1') newOdontogram[toothNum].surfaces.left = true;
-          else if (String(item.FACE2) === '0') newOdontogram[toothNum].surfaces.left = false;
-          
-          if (String(item.FACE3) === '-1') newOdontogram[toothNum].surfaces.bottom = true;
-          else if (String(item.FACE3) === '0') newOdontogram[toothNum].surfaces.bottom = false;
-          
-          if (String(item.FACE4) === '-1') newOdontogram[toothNum].surfaces.right = true;
-          else if (String(item.FACE4) === '0') newOdontogram[toothNum].surfaces.right = false;
-          
-          if (String(item.FACE5) === '-1') newOdontogram[toothNum].surfaces.center = true;
-          else if (String(item.FACE5) === '0') newOdontogram[toothNum].surfaces.center = false;
-        }
-      });
+
+          if (item.FACE1 !== undefined && item.FACE1 !== null) {
+            newOdontogram[toothNum].surfaces.top = String(item.FACE1) === '-1';
+            newOdontogram[toothNum].surfaces.right = String(item.FACE2) === '-1';
+            newOdontogram[toothNum].surfaces.bottom = String(item.FACE3) === '-1';
+            newOdontogram[toothNum].surfaces.left = String(item.FACE4) === '-1';
+            newOdontogram[toothNum].surfaces.center = String(item.FACE5) === '-1';
+          }
+        });
+      }
 
       // Filtrar itens únicos para exibição na lista de histórico
       const unique = normalized.filter((item, index, self) =>
@@ -379,7 +375,7 @@ export default function PatientRecordPage() {
   useEffect(() => {
     async function loadCatalog() {
       try {
-        const res = await fetch('/api/catalogo');
+        const res = await fetch('/api/catalogo', { cache: 'no-store' });
         const data = await res.json();
         setCatalogData(data);
       } catch (err) { console.error(err); } finally { setLoadingCatalog(false); }
@@ -400,7 +396,7 @@ export default function PatientRecordPage() {
     const currentOdontogram = patientOdontograms[pId] || initialOdontogram();
     const patientMods = modifiedTeeth[pId] || [];
     
-    // Novas intervenções lançadas pelo modal
+    // Novas intervenções lançadas pelo modal que AINDA NÃO FORAM SALVAS (ids numéricos gerados localmente)
     const newInterventions = history.filter(h => typeof h.id === 'number');
     
     // Alterações manuais no odontograma (clicando no dente)
@@ -429,14 +425,13 @@ export default function PatientRecordPage() {
     const allToSave = [...updatedInterventions, ...manualMods];
     
     if (allToSave.length === 0) {
-      if (!silent) alert(`Nenhuma alteração detectada.\n- Novas intervenções pendentes: ${newInterventions.length}\n- Dentes modificados: ${patientMods.length} (${patientMods.join(', ')})\n- ID do Paciente: ${pId}`);
+      if (!silent) alert(`Nenhuma alteração detectada.`);
       return;
     }
 
     if (!silent) setLoadingHistory(true);
     setIsAutoSaving(true);
     try {
-      console.log(`[FRONTEND] Sending ${allToSave.length} items to save for patient ${pId}`);
       const res = await fetch(`/api/pacientes/${pId}/salvar`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
@@ -444,6 +439,7 @@ export default function PatientRecordPage() {
       });
       
       if (res.ok) {
+        // Limpar apenas os dentes que enviamos agora
         setModifiedTeeth(prev => ({ ...prev, [pId]: [] }));
         await fetchHistory(pId);
         if (!silent) alert("Alterações salvas com sucesso!");
@@ -473,7 +469,7 @@ export default function PatientRecordPage() {
       
       saveTimeoutRef.current = setTimeout(() => {
         handleSaveAll(true);
-      }, 1500);
+      }, 2000);
     }
     
     return () => {
@@ -506,11 +502,8 @@ export default function PatientRecordPage() {
   };
 
   const formatCurrencyInput = (val: string) => {
-    // Se o valor já vem formatado do catálogo ou digitado, extraímos apenas números
     const numericVal = val.replace(/\D/g, "");
     if (!numericVal) return "R$ 0,00";
-    
-    // Trata como valor em centavos
     const floatVal = parseFloat(numericVal) / 100;
     return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
@@ -532,16 +525,15 @@ export default function PatientRecordPage() {
     
     const finalTotal = Math.max(0, baseVal - disc);
     
-    // Calculate final value for each item proportionally
-    const totalOriginalCatalog = selectedProcedures.reduce((acc, p) => acc + (p.price || 0), 0) || baseVal;
-    const distributionRatio = finalTotal / totalOriginalCatalog;
-
     const toothNum = manualTooth || selectedTooth?.toString() || "Geral";
     const timestamp = Date.now();
 
     const proceduresToLaunch = selectedProcedures.length > 0 ? selectedProcedures : [{ name: selectedTreatment, price: baseVal, id: selectedTreatmentId }];
     const combinedName = proceduresToLaunch.map(p => p.name).join(" + ");
 
+    const pId = String(selectedPatient.id);
+    const currentOdontogram = patientOdontograms[pId] || initialOdontogram();
+    
     const newItem = { 
       id: timestamp, 
       type: 'intervention', 
@@ -557,23 +549,26 @@ export default function PatientRecordPage() {
       numericValue: finalTotal, 
       notes: `${procedureTime} | Convênio: ${conv} | Pagamento: ${pay} (${installments}x) | ${observation}`,
       installments: installments,
-      toothData: toothNum !== "Geral" && toothNum.length <= 2 ? {
-        status: 'restoration', 
-        surfaces: procedureFaces
-      } : undefined
+      toothData: toothNum !== "Geral" && !isNaN(parseInt(toothNum)) ? currentOdontogram[parseInt(toothNum)] : undefined
     };
     
-    console.log("DEBUG: Saving new item:", newItem);
-    
     try {
-      const pId = String(selectedPatient.id);
       const res = await fetch(`/api/pacientes/${pId}/salvar`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ interventions: [newItem], odontogram: patientOdontograms[pId] || initialOdontogram() }) 
+        body: JSON.stringify({ interventions: [newItem], odontogram: currentOdontogram }) 
       });
       
       if (res.ok) {
+        // Importante: Limpar o dente se ele estava pendente de salvar manual
+        const tInt = parseInt(toothNum);
+        if (!isNaN(tInt)) {
+          setModifiedTeeth(prev => ({
+            ...prev,
+            [pId]: (prev[pId] || []).filter(n => n !== tInt)
+          }));
+        }
+        
         await fetchHistory(pId);
         alert(`Procedimento "${combinedName}" lançado com sucesso!`);
         
@@ -710,10 +705,9 @@ export default function PatientRecordPage() {
 </span>
                          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Dente {item.tooth}</span>
                       </div>
-                      <h4 className="text-[10px] font-black text-slate-800 uppercase line-clamp-2 leading-tight h-7">
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase line-clamp-2 leading-tight min-h-[25px]">
                         {item.procedure}
-                      </h4>
-                      <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-50">
+                      </h4>                      <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-50">
                          <div className="flex flex-col">
                             <span className="text-[7px] font-bold text-slate-500 uppercase truncate max-w-[80px]">{item.professional}</span>
                             <span className={cn(
@@ -911,7 +905,7 @@ export default function PatientRecordPage() {
             <div className="px-6 py-[19px] border-t border-slate-200 bg-white flex items-center justify-between shadow-2xl">
                <div className="flex flex-col">
                   <p className="text-[9px] font-black text-slate-400 uppercase">Procedimento</p>
-                  <p className="text-sm font-black uppercase text-slate-800 line-clamp-1 max-w-[400px]">{selectedTreatment || "Nenhum"}</p>
+                  <p className="text-sm font-black uppercase text-slate-800 leading-tight">{selectedTreatment || "Nenhum"}</p>
                   {selectedTreatment && (
                      <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
                         Total: {treatmentValue || "R$ 0,00"}

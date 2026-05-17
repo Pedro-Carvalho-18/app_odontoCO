@@ -16,9 +16,9 @@ export async function GET(request: Request) {
     // Excluímos lançamentos de DÉBITO/LANÇAMENTO (NROLAN 4, 5) para evitar duplicatas semânticas
     const patientIncome = await db.all(
       `SELECT 
-        'p-' || MAX(C.REGISTRO) as id,
+        'p-' || C.REGISTRO as id,
         C.DATA as date,
-        MAX(C.HISTORICO) as description,
+        C.HISTORICO as description,
         C.VALOR as value,
         P.PRINOM as patientName,
         TP.NOME as paymentMethod,
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       LEFT JOIN __TIPO_PAGTO TP ON C.TIPO_PAGTO = TP.REGISTRO
       WHERE DATE(C.DATA) BETWEEN DATE(?) AND DATE(?)
       AND C.NROLAN IN ('6', '7', '8', '105') 
-      GROUP BY C.NROPAC, DATE(C.DATA), C.VALOR
+      AND C.HISTORICO NOT LIKE '%Alteração Odontograma%'
       ORDER BY C.DATA DESC`,
       [start, end]
     );
@@ -36,9 +36,9 @@ export async function GET(request: Request) {
     // 2. Movimentações do Cirurgião (CCCIRURGIAO)
     const surgeonMoves = await db.all(
       `SELECT 
-        'c-' || MAX(C.REGISTRO) as id,
+        'c-' || C.REGISTRO as id,
         C.DATA as date,
-        MAX(C.HISTORICO) as description,
+        C.HISTORICO as description,
         C.VALOR as value,
         PR.NOME as professionalName,
         C.NROLAN as code,
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       LEFT JOIN PRESTADOR PR ON C.ID_PRESTADOR = PR.ID_PRESTADOR
       WHERE DATE(C.DATA) BETWEEN DATE(?) AND DATE(?)
       AND (C.NROCCPAC IS NULL OR C.NROCCPAC = '' OR C.NROCCPAC = '0')
-      GROUP BY C.ID_PRESTADOR, DATE(C.DATA), C.VALOR, C.NROLAN
+      AND C.HISTORICO NOT LIKE '%Alteração Odontograma%'
       ORDER BY C.DATA DESC`,
       [start, end]
     );
@@ -64,16 +64,18 @@ export async function GET(request: Request) {
         SUM(CASE WHEN NROLAN IN ('6', '7', '8', '105') THEN VALOR ELSE 0 END) as totalPayments
       FROM CCPACIENTE
       WHERE STRFTIME('%Y', DATA) >= '2000'
+      AND HISTORICO NOT LIKE '%Alteração Odontograma%'
     `);
     
     const totalPending = Math.max(0, (ledgerBalance?.totalCharges || 0) - (ledgerBalance?.totalPayments || 0));
 
     // 4. Lista de Detalhes Pendentes (Itemizada via Conta Corrente)
-    // Buscamos cada tratamento (NROTRA) que ainda possui saldo devedor
+    // Buscamos cada parcela de tratamento (NROTRA + NROPAR) que ainda possui saldo devedor
     const pendingList = await db.all(`
       SELECT 
         C.NROTRA,
         C.NROPAC,
+        C.NROPAR,
         MAX(C.DATA) as lastDate,
         MAX(C.HISTORICO) as description,
         SUM(CASE WHEN NROLAN IN ('4', '5') THEN VALOR ELSE 0 END) - 
@@ -83,7 +85,8 @@ export async function GET(request: Request) {
       LEFT JOIN PESSOAL P ON C.NROPAC = P.NROPAC
       WHERE STRFTIME('%Y', C.DATA) >= '2000'
       AND C.NROTRA IS NOT NULL AND C.NROTRA != '0'
-      GROUP BY C.NROPAC, C.NROTRA
+      AND C.HISTORICO NOT LIKE '%Alteração Odontograma%'
+      GROUP BY C.NROPAC, C.NROTRA, COALESCE(C.NROPAR, '0')
       HAVING balance > 0.01
       ORDER BY lastDate DESC
     `);
@@ -99,6 +102,9 @@ export async function GET(request: Request) {
         description: `A RECEBER: ${item.description || 'Tratamento'}`,
         value: item.balance,
         patientName: item.patientName,
+        nroTra: item.NROTRA,
+        nroPac: item.NROPAC,
+        nroPar: item.NROPAR || "1",
         type: 'pending'
       });
     }

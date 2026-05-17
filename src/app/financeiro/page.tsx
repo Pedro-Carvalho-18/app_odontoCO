@@ -194,10 +194,14 @@ export default function FinanceiroPage() {
 
   const handleMarkPaid = async (item: any) => {
     if (!confirm(`Confirmar recebimento de ${formatCurrency(item.value)}? Isso gerará uma entrada no caixa.`)) return;
-    // O ID de pendência é formatado como 'pending-item-counter-nroTra-nroPac'
+    // O ID de pendência é formatado como 'pending-item-counter-nroTra-nroPac' ou agora inclui nroPar
+    // Precisamos de uma forma robusta de pegar os dados
     const parts = item.id.split('-');
-    const nroTra = parts[parts.length - 2];
-    const nroPac = parts[parts.length - 1];
+    // O formato atual é 'pending-item-counter-nroTra-nroPac'
+    // Mas item tem nroTra, nroPac e nroPar se vier da API atualizada
+    const nroTra = item.nroTra || parts[parts.length - 2];
+    const nroPac = item.nroPac || parts[parts.length - 1];
+    const nroPar = item.nroPar || "1";
 
     try {
       const res = await fetch('/api/financeiro/pagar', {
@@ -206,6 +210,7 @@ export default function FinanceiroPage() {
         body: JSON.stringify({ 
           nroTra, 
           nroPac,
+          nroPar,
           value: item.value,
           description: item.description.replace('A RECEBER: ', 'Pg ')
         })
