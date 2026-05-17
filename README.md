@@ -23,7 +23,7 @@ Bem-vindo ao **OdontOC**! O sistema foi projetado para rodar localmente na sua m
 ### 💿 Baixar o Instalador (Versão Completa)
 Para instalar o sistema na sua clínica pela primeira vez, baixe o executável abaixo. Ele instalará o sistema e criará o banco de dados inicial vazio para você começar.
 
-> **[🚀 Baixar Instalador OdontOC - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontoCO_Setup_1.0.0.exe)**
+> **[🚀 Baixar Instalador OdontOC - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontoCO_Setup_0.1.0.exe)**
 
 **Como instalar:**
 1. Baixe o arquivo `.exe` acima.
