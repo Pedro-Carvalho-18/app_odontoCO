@@ -25,7 +25,8 @@ import {
   Upload,
   Clock,
   User,
-  Printer
+  Printer,
+  Pill
 } from "lucide-react";
 import { cn, normalizeString } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -564,6 +565,7 @@ export default function PatientRecordPage() {
       professional: prof, 
       professionalId: selectedProfessionalId,
       paymentMethodId: selectedPaymentId,
+      paymentMethod: pay,
       isPaid: isPaid,
       value: finalTotal, 
       numericValue: finalTotal, 
@@ -648,16 +650,22 @@ export default function PatientRecordPage() {
         <div className="flex items-center gap-2">
           {selectedPatient && (
             <>
-              <button onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} className="px-3 py-1 bg-slate-100 rounded-xl border border-slate-200 text-[10px] font-black uppercase hover:bg-slate-200 transition-colors" title="Ver Perfil do Paciente">
+              <button onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-xl border border-slate-200 text-[10px] font-black uppercase hover:bg-slate-200 transition-colors" title="Ver Perfil do Paciente">
+                <User size={12} className="text-slate-500" />
                 {selectedPatient.name}
               </button>
               <div className="h-4 w-px bg-slate-200 mx-1" />
               <button onClick={() => setShowFilesModal(true)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={18} /></button>
-              <button onClick={() => setShowPrescriptionModal(true)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><FileEdit size={18} /></button>
-              <div className="h-4 w-px bg-slate-200 mx-1" />
+              <button onClick={() => setShowPrescriptionModal(true)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><Pill size={18} /></button>
             </>
           )}
-          <button onClick={() => setShowLaunchModal(true)} className="px-4 py-2 flex items-center gap-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-black text-[10px] uppercase"><Plus size={16} /> Novo Lançamento</button>
+          <button 
+            onClick={() => setShowLaunchModal(true)} 
+            className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all"
+            title="Novo Lançamento"
+          >
+            <FileEdit size={18} />
+          </button>
           
           <div className="h-4 w-px bg-slate-200 mx-1" />
 
@@ -760,8 +768,13 @@ export default function PatientRecordPage() {
       {showLaunchModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-0 animate-in fade-in duration-300">
           <div className="bg-slate-50 w-full h-full flex flex-col">
-            <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
-               <div className="flex items-center gap-3"><div className="p-2 bg-blue-600 text-white rounded-xl"><Plus size={20} /></div><h3 className="text-sm font-black uppercase">Novo Lançamento</h3></div>
+            <div className="px-8 py-3 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
+               <div className="flex items-center gap-2.5">
+                 <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg">
+                   <Plus size={16} />
+                 </div>
+                 <h3 className="text-[12px] font-black uppercase text-slate-900">Novo Lançamento</h3>
+               </div>
                <button onClick={() => setShowLaunchModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
             </div>
             <div className="flex-1 overflow-hidden flex">

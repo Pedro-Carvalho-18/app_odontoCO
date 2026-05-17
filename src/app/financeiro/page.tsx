@@ -261,7 +261,7 @@ export default function FinanceiroPage() {
     // Construct CSV content
     const csvContent = [
       headers.join(";"),
-      ...rows.map(e => e.join(";"))
+      ...rows.map((e: any) => e.join(";"))
     ].join("\n");
 
     // Create and trigger download
@@ -556,12 +556,12 @@ export default function FinanceiroPage() {
       {showNewModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-lg rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
-              <div className="px-8 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Plus size={20} /></div>
+              <div className="px-8 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                 <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-slate-900 text-white rounded-lg shadow-lg"><Plus size={16} /></div>
                     <div>
-                       <h3 className="text-[10px] font-black uppercase text-slate-900">Novo Lançamento</h3>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Registre uma nova entrada ou saída</p>
+                       <h3 className="text-[9px] font-black uppercase text-slate-900">Novo Lançamento</h3>
+                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Registre uma nova entrada ou saída</p>
                     </div>                 </div>
                  <button onClick={() => setShowNewModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
               </div>

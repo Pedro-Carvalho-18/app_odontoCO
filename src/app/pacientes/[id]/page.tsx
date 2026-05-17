@@ -48,6 +48,7 @@ interface TreatmentItem {
   convenio?: string;
   nroTra?: string;
   filesCount?: number;
+  prescriptions?: string;
 }
 
 export default function PatientProfilePage() {

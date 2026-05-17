@@ -146,6 +146,30 @@ export default function PatientsPage() {
       .replace(/(-\d{2})\d+?$/, "$1");
   };
 
+  const maskRG = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1})/, "$1-$2")
+      .replace(/(-\d{1})\d+?$/, "$1");
+  };
+
+  const maskPhone = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2")
+      .replace(/(-\d{4})\d+?$/, "$1");
+  };
+
+  const maskCEP = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{5})(\d)/, "$1-$2")
+      .replace(/(-\d{3})\d+?$/, "$1");
+  };
+
   const fetchPatients = async (query = "", pageNum = 1, append = false) => {
     if (isFetchingRef.current) return;
     
@@ -205,12 +229,14 @@ export default function PatientsPage() {
       if (res.ok) {
         setShowNewModal(false);
         setNewPatientForm({
-          name: "", email: "", phone: "", cpf: "", rg: "", 
-          birthDate: "", address: "", neighborhood: "", 
-          city: "", state: "", zipCode: "", profession: "",
+          name: "", email: "", phone: "", cpf: "", rg: "",
+          birthDate: "", sex: "2", maritalStatus: "6",
+          address: "", neighborhood: "", city: "ARARAQUARA",
+          state: "SP", zipCode: "", profession: "",
+          nickname: "", convenioId: "1", registrationNumber: "",
+          preferredProfessionalId: "1", referralTypeId: "3", status: "2",
           anamnesis: initialAnamnesis.map(q => ({ ...q, value: "" }))
         });
-        setPage(1);
         fetchPatients(searchTerm, 1, false);
       }
     } catch (err) {
@@ -411,7 +437,7 @@ export default function PatientsPage() {
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">RG</label>
-                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.rg} onChange={e => setNewPatientForm({...newPatientForm, rg: e.target.value})} />
+                    <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.rg} onChange={e => setNewPatientForm({...newPatientForm, rg: maskRG(e.target.value)})} />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Profissão</label>
@@ -434,11 +460,11 @@ export default function PatientsPage() {
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
-                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.phone} onChange={e => setNewPatientForm({...newPatientForm, phone: e.target.value})} />
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.phone} onChange={e => setNewPatientForm({...newPatientForm, phone: maskPhone(e.target.value)})} />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
-                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.zipCode} onChange={e => setNewPatientForm({...newPatientForm, zipCode: e.target.value})} />
+                      <input type="text" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none" value={newPatientForm.zipCode} onChange={e => setNewPatientForm({...newPatientForm, zipCode: maskCEP(e.target.value)})} />
                     </div>
                     <div className="col-span-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label>
