@@ -47,13 +47,16 @@ export async function POST(
           console.log(`[SAVE] Input date: ${inter.date}`);
 
           // Fix date format: Ensure it's YYYY-MM-DD 00:00:00.000, no timezone shift
-          // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:mm:ss' formats
           const dateOnly = inter.date.split('T')[0];
           const [yyyy, mm, dd] = dateOnly.split('-').map((s: string) => s.padStart(2, '0'));
           const formattedDate = `${yyyy}-${mm}-${dd} 00:00:00.000`;
-          console.log(`[SAVE] Formatted date: ${formattedDate}`);
-
+          
           const now = new Date().toISOString().replace('T', ' ').split('.')[0].replace('Z', '') + '.000';
+          const today = new Date().toISOString().split('T')[0];
+
+          const lastTraRow = await db.get("SELECT MAX(CAST(NROTRA AS INTEGER)) as id FROM CCPACIENTE");
+          const nextTraId = (Number(lastTraRow?.id) || 0) + 1;
+
           await db.run(
             `INSERT INTO INTERVENCAO (
               NROPAC, NROINTPAC, NROTRA, ID_PRESTADOR, NROINT, 
@@ -63,7 +66,7 @@ export async function POST(
             [
               patientId,
               nextNroIntPac.toString(),
-              '1',
+              nextTraId.toString(),
               inter.professionalId || '1',
               inter.procedureId || '0',
               formattedDate,
@@ -75,6 +78,61 @@ export async function POST(
               now
             ]
           );
+
+          // FINANCIAL INTEGRATION: Create debt and payment in CCPACIENTE
+          if (inter.numericValue > 0) {
+            // 1. Create DEBT record (NROLAN '4')
+            const lastCcRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+            const nextCcId = (Number(lastCcRow?.id) || 0) + 1;
+
+            await db.run(
+              `INSERT INTO CCPACIENTE (
+                REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
+              ) VALUES (?, ?, ?, ?, '4', '255', ?, ?, ?, ?, ?)`,
+              [
+                nextCcId.toString(),
+                patientId,
+                formattedDate,
+                `LANÇAMENTO: ${inter.procedure}`,
+                inter.numericValue.toString(),
+                "SISTEMA",
+                now,
+                today + " 00:00:00.000",
+                nextTraId.toString()
+              ]
+            );
+
+            // 2. Create PAYMENT record if payment method is provided (NROLAN '6') and isPaid is true
+            // Assume the first installment is paid if installments > 1, or the whole thing if 1x
+            if (inter.isPaid && inter.paymentMethodId && inter.paymentMethodId !== 'none') {
+               const lastPayRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+               const nextPayId = (Number(lastPayRow?.id) || 0) + 1;
+               
+               const instCount = Math.max(1, parseInt(inter.installments) || 1);
+               const rawValue = parseFloat(inter.numericValue) || 0;
+               const payValue = rawValue / instCount;
+
+               await db.run(
+                 `INSERT INTO CCPACIENTE (
+                   REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                   TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
+                 ) VALUES (?, ?, ?, ?, '6', '255', ?, ?, ?, ?, ?, ?)`,
+                 [
+                   nextPayId.toString(),
+                   patientId,
+                   formattedDate,
+                   `PAGTO: ${inter.procedure} (${instCount === 1 ? 'Total' : 'Parc 1/' + instCount})`,
+                   payValue.toFixed(2),
+                   inter.paymentMethodId,
+                   "SISTEMA",
+                   now,
+                   today + " 00:00:00.000",
+                   nextTraId.toString()
+                 ]
+               );
+            }
+          }
 
           const toothNum = parseInt(inter.tooth);
           if (!isNaN(toothNum) && inter.toothData) {

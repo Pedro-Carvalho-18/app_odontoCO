@@ -48,9 +48,42 @@ export default function FinanceiroPage() {
     type: "expense", // income | expense
     professionalId: "1",
     paymentMethodId: "4", // Dinheiro padrão
-    patientId: "" as string | null,
+    patientId: null as string | null,
     patientName: ""
   });
+
+  const [selectedProcedures, setSelectedProcedures] = useState<any[]>([]);
+
+  const formatCurrencyInput = useCallback((val: string) => {
+    const numericVal = val.replace(/\D/g, "");
+    if (!numericVal) return "";
+    const floatVal = parseFloat(numericVal) / 100;
+    return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }, []);
+
+  useEffect(() => {
+    if (selectedProcedures.length > 0) {
+      const description = selectedProcedures.map(p => p.name).join(" + ");
+      const totalValue = selectedProcedures.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+      
+      setFormData(prev => ({
+        ...prev,
+        description,
+        value: totalValue > 0 ? formatCurrencyInput((totalValue * 100).toString()) : prev.value
+      }));
+    }
+  }, [selectedProcedures, formatCurrencyInput]);
+
+  const handleProcedureToggle = (e: React.MouseEvent, proc: any) => {
+    e.preventDefault();
+    setSelectedProcedures(prev => {
+      const isSelected = prev.find(p => p.id === proc.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== proc.id);
+      }
+      return [...prev, proc];
+    });
+  };
 
   // Filter State
   const [filterMode, setFilterMode] = useState<"all" | "income" | "expense" | "pending">("all");
@@ -143,13 +176,6 @@ export default function FinanceiroPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const formatCurrencyInput = (val: string) => {
-    const numericVal = val.replace(/\D/g, "");
-    if (!numericVal) return "";
-    const floatVal = parseFloat(numericVal) / 100;
-    return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   const handleDelete = async (id: string, type: string) => {
@@ -646,6 +672,33 @@ export default function FinanceiroPage() {
                       value={formData.description}
                       onChange={e => setFormData({...formData, description: e.target.value})}
                     />
+                 </div>
+
+                 {/* Procedure Multi-Selector */}
+                 <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Procedimentos (Soma automática)</label>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
+                       {catalog?.procedures?.map((p: any) => {
+                          const isSelected = selectedProcedures.find(proc => proc.id === p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={(e) => handleProcedureToggle(e, p)}
+                              className={cn(
+                                "p-3 rounded-xl border text-left transition-all flex flex-col gap-0.5",
+                                isSelected 
+                                  ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100" 
+                                  : "bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-200"
+                              )}
+                            >
+                               <span className="text-[9px] font-black uppercase leading-tight truncate w-full">{p.name}</span>
+                               <span className={cn("text-[9px] font-bold", isSelected ? "text-blue-100" : "text-slate-400")}>
+                                 {formatCurrency(Number(p.price) || 0)}
+                               </span>
+                            </button>
+                          );
+                       })}
+                    </div>
                  </div>
 
                  <div className="grid grid-cols-2 gap-4">

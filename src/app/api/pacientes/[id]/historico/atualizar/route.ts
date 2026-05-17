@@ -16,11 +16,9 @@ export async function POST(
       const statusValue = status === 'Concluído' ? '2' : status === 'Cancelado' ? '3' : '1';
 
       // Ler estado atual para saber se parcelas foram adicionadas
-      const current = await db.get(`SELECT ORCAMENTO FROM INTERVENCAO WHERE NROINTPAC = ? AND NROPAC = ?`, [id, patientId]);
+      const current = await db.get(`SELECT ORCAMENTO, NROTRA FROM INTERVENCAO WHERE NROINTPAC = ? AND NROPAC = ?`, [id, patientId]);
       const oldPaidInst = parseInt(current?.ORCAMENTO || '0') || 0;
-
-      // ATENÇÃO: Nunca mais mexer no OBSERV para não quebrar o nome do procedimento.
-      // Vamos usar a coluna ORCAMENTO para guardar o número de parcelas pagas como metadado.
+      const interTraId = current?.NROTRA || nroTra || '1';
 
       await db.run(
         `UPDATE INTERVENCAO 
@@ -61,17 +59,17 @@ export async function POST(
           await db.run(
             `INSERT INTO CCPACIENTE (
               REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-              TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO
-            ) VALUES (?, ?, ?, ?, ?, '255', ?, '1', '1', ?, ?)`,
+              TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA
+            ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?)`,
             [
               nextId.toString(),
               patientId,
               today,
               `Pagamento Parcela ${currentInstallmentNumber}/${totalInst} - ${procName}`,
-              '1', 
               valPerInst.toFixed(2),
               now,
-              today
+              today,
+              interTraId.toString()
             ]
           );
         }

@@ -155,8 +155,9 @@ export default function PatientRecordPage() {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedTreatment, setSelectedTreatment] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
+  const [selectedProcedures, setSelectedProcedures] = useState<any[]>([]);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("1");
-  const [selectedPaymentId, setSelectedPaymentId] = useState<string>("1");
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string>("none");
   const [selectedConvenioId, setSelectedConvenioId] = useState<string>("1");
 
   const [history, setHistory] = useState<any[]>([]);
@@ -177,6 +178,7 @@ export default function PatientRecordPage() {
   });
   const [procedureTime, setProcedureTime] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
   const [procedureStatus, setProcedureStatus] = useState("A Fazer");
+  const [isPaid, setIsPaid] = useState(false);
   const [procedureFaces, setProcedureFaces] = useState({ top: false, bottom: false, left: false, right: false, center: false });
   const [discountValue, setDiscountValue] = useState("");
   const [showLaunchModal, setShowLaunchModal] = useState(false);
@@ -306,7 +308,8 @@ export default function PatientRecordPage() {
 
       // Filtrar itens únicos para exibição na lista de histórico
       const unique = normalized.filter((item, index, self) =>
-        index === self.findIndex((t) => (t.id === item.id && t.type === item.type))
+        index === self.findIndex((t) => (t.id === item.id && t.type === item.type)) &&
+        !item.procedure?.includes("Alteração Odontograma")
       );
 
       setPatientOdontograms(prev => ({ ...prev, [pIdStr]: newOdontogram }));
@@ -513,7 +516,7 @@ export default function PatientRecordPage() {
   };
 
   const handleLaunchTreatment = async () => {
-    if (!selectedTreatment || !selectedPatient) return;
+    if ((selectedProcedures.length === 0 && !selectedTreatment) || !selectedPatient) return;
     
     setLoadingHistory(true);
     
@@ -527,23 +530,32 @@ export default function PatientRecordPage() {
     const discStr = discountValue.replace(/\D/g, '');
     const disc = (parseInt(discStr) || 0) / 100;
     
-    const finalVal = Math.max(0, baseVal - disc);
+    const finalTotal = Math.max(0, baseVal - disc);
     
-    console.log("DEBUG LAUNCH:", { baseVal, disc, finalVal, installments });
-    
+    // Calculate final value for each item proportionally
+    const totalOriginalCatalog = selectedProcedures.reduce((acc, p) => acc + (p.price || 0), 0) || baseVal;
+    const distributionRatio = finalTotal / totalOriginalCatalog;
+
     const toothNum = manualTooth || selectedTooth?.toString() || "Geral";
-    
+    const timestamp = Date.now();
+
+    const proceduresToLaunch = selectedProcedures.length > 0 ? selectedProcedures : [{ name: selectedTreatment, price: baseVal, id: selectedTreatmentId }];
+    const combinedName = proceduresToLaunch.map(p => p.name).join(" + ");
+
     const newItem = { 
-      id: Date.now(), 
+      id: timestamp, 
       type: 'intervention', 
       date: procedureDate, 
       tooth: toothNum, 
-      procedure: selectedTreatment || "Procedimento", 
+      procedure: combinedName, 
       status: procedureStatus, 
       professional: prof, 
-      value: finalVal, 
-      numericValue: finalVal, 
-      notes: `${procedureTime} | Convênio: ${conv} | Pagamento: ${pay} (${installments}x) | Desconto: R$ ${disc.toFixed(2)} | ${observation}`,
+      professionalId: selectedProfessionalId,
+      paymentMethodId: selectedPaymentId,
+      isPaid: isPaid,
+      value: finalTotal, 
+      numericValue: finalTotal, 
+      notes: `${procedureTime} | Convênio: ${conv} | Pagamento: ${pay} (${installments}x) | ${observation}`,
       installments: installments,
       toothData: toothNum !== "Geral" && toothNum.length <= 2 ? {
         status: 'restoration', 
@@ -563,7 +575,17 @@ export default function PatientRecordPage() {
       
       if (res.ok) {
         await fetchHistory(pId);
-        alert(`Procedimento "${selectedTreatment}" lançado e salvo com sucesso no prontuário!`);
+        alert(`Procedimento "${combinedName}" lançado com sucesso!`);
+        
+        // Reset state
+        setSelectedProcedures([]);
+        setSelectedTreatment(null);
+        setSelectedTreatmentId(null);
+        setTreatmentValue("");
+        setDiscountValue("");
+        setObservation("");
+        setSelectedPaymentId("1");
+        setInstallments("1");
         setShowLaunchModal(false);
       } else {
         const errData = await res.json();
@@ -727,7 +749,7 @@ export default function PatientRecordPage() {
                         <input type="text" placeholder="Buscar catálogo..." value={procedureSearchTerm} onChange={(e) => setProcedureSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none" />
                      </div>
                      {selectedTreatment && (
-                        <button onClick={() => { setSelectedTreatment(null); setSelectedTreatmentId(null); setTreatmentValue(""); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-all" title="Limpar seleção">
+                        <button onClick={() => { setSelectedTreatment(null); setSelectedTreatmentId(null); setTreatmentValue(""); setSelectedProcedures([]); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-all" title="Limpar seleção">
                            <X size={16} />
                         </button>
                      )}
@@ -751,21 +773,47 @@ export default function PatientRecordPage() {
                               
                               {isExpanded && (
                                  <div className="p-2 space-y-1">
-                                    {procs.map(i => (
-                                       <button 
-                                          key={i.id} 
-                                          onClick={() => {
-                                             setSelectedTreatment(i.name); 
-                                             setSelectedTreatmentId(i.id); 
-                                             // Convert explicit price (e.g. 50.00) to cents (5000) for the formatter
-                                             const priceInCents = Math.round((i.price || 0) * 100);
-                                             setTreatmentValue(formatCurrencyInput(priceInCents.toString()));
-                                          }} 
-                                          className={cn("w-full text-left p-3 rounded-xl text-[10px] font-bold border transition-all", selectedTreatmentId === i.id ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-100 hover:bg-blue-50")}
-                                       >
-                                          {i.name}
-                                       </button>
-                                    ))}
+                                    {procs.map(i => {
+                                       const isSelected = selectedProcedures.some(p => p.id === i.id);
+                                       return (
+                                          <button 
+                                             key={i.id} 
+                                             onClick={() => {
+                                                let newSelected;
+                                                if (isSelected) {
+                                                   newSelected = selectedProcedures.filter(p => p.id !== i.id);
+                                                } else {
+                                                   newSelected = [...selectedProcedures, i];
+                                                }
+                                                setSelectedProcedures(newSelected);
+                                                
+                                                // Update summary display
+                                                if (newSelected.length === 1) {
+                                                   setSelectedTreatment(newSelected[0].name);
+                                                   setSelectedTreatmentId(newSelected[0].id);
+                                                } else if (newSelected.length > 1) {
+                                                   setSelectedTreatment(newSelected.map(p => p.name).join(" + "));
+                                                   setSelectedTreatmentId("multiple");
+                                                } else {
+                                                   setSelectedTreatment(null);
+                                                   setSelectedTreatmentId(null);
+                                                }
+
+                                                // Update total value
+                                                const totalInCents = newSelected.reduce((acc, p) => acc + Math.round((parseFloat(p.price) || 0) * 100), 0);
+                                                setTreatmentValue(formatCurrencyInput(totalInCents.toString()));
+                                             }} 
+                                             className={cn("w-full text-left p-3 rounded-xl text-[10px] font-bold border transition-all", isSelected ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white border-slate-100 hover:bg-blue-50")}
+                                          >
+                                             <div className="flex justify-between items-center">
+                                                <span className="flex-1 mr-2">{i.name}</span>
+                                                <span className={cn("shrink-0 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase", isSelected ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500")}>
+                                                   {formatCurrencyInput(Math.round((i.price || 0) * 100).toString())}
+                                                </span>
+                                             </div>
+                                          </button>
+                                       );
+                                    })}
                                  </div>
                               )}
                            </div>
@@ -840,10 +888,20 @@ export default function PatientRecordPage() {
 
                      <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2">
                         <div className="grid grid-cols-4 gap-2">
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Pagamento</label><select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-bold outline-none h-[32px]">{catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Pagamento</label>
+                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-bold outline-none h-[32px]">
+                                 <option value="none">Sem Pagamento</option>
+                                 {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                              </select>
+                           </div>
+                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Recebimento</label>
+                              <div className="flex bg-slate-50 rounded-xl border border-slate-100 p-1 h-[32px]">
+                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[9px] font-bold rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-700" : "text-slate-400 hover:bg-slate-100")}>Pendente</button>
+                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[9px] font-bold rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-100")}>Pago</button>
+                              </div>
+                           </div>
                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-bold outline-none h-[32px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Valor Original</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold text-slate-700 outline-none h-[32px]" /></div>
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Desconto</label><input type="text" placeholder="R$ 0,00" value={discountValue} onChange={e => setDiscountValue(formatCurrencyInput(e.target.value))} className="w-full p-2 bg-rose-50 rounded-xl border border-rose-100 text-xs font-bold text-rose-700 outline-none placeholder:text-rose-300 h-[32px]" /></div>
+                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold text-slate-700 outline-none h-[32px]" /></div>
                         </div>
                         <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Notas técnicas..." className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] h-10 outline-none resize-none" />
                      </div>
@@ -851,7 +909,15 @@ export default function PatientRecordPage() {
                </div>
             </div>
             <div className="px-6 py-[19px] border-t border-slate-200 bg-white flex items-center justify-between shadow-2xl">
-               <div className="flex flex-col"><p className="text-[9px] font-black text-slate-400 uppercase">Procedimento</p><p className="text-lg font-black uppercase text-slate-800">{selectedTreatment || "Nenhum"}</p></div>
+               <div className="flex flex-col">
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Procedimento</p>
+                  <p className="text-sm font-black uppercase text-slate-800 line-clamp-1 max-w-[400px]">{selectedTreatment || "Nenhum"}</p>
+                  {selectedTreatment && (
+                     <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
+                        Total: {treatmentValue || "R$ 0,00"}
+                     </p>
+                  )}
+               </div>
                <div className="flex items-center gap-4"><button onClick={() => setShowLaunchModal(false)} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Cancelar</button><button onClick={handleLaunchTreatment} disabled={!selectedTreatment} className={cn("px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg", selectedTreatment ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-200 text-slate-400")}>Lançar no Prontuário</button></div>
             </div>
           </div>

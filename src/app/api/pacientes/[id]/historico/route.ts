@@ -79,13 +79,20 @@ export async function GET(
         COALESCE(TRIM(C.NOME), 'Particular') as convenio,
         DF.BITMAP as dentalStatus,
         DF.NRODEN as internalToothId,
-        DF.FACE1, DF.FACE2, DF.FACE3, DF.FACE4, DF.FACE5
+        DF.FACE1, DF.FACE2, DF.FACE3, DF.FACE4, DF.FACE5,
+        COALESCE(FIN.totalPaid, 0) as totalPaid
       FROM INTERVENCAO I
       LEFT JOIN TRATAMENTO TR ON I.NROTRA = TR.NROTRA
       LEFT JOIN TAB_GEN_ITEM T ON I.NROINT = T.ID_PRC_GEN
       LEFT JOIN TAB_PRC_ITEM PRC ON I.NROINT = PRC.ID_PRC_TAB AND I.NROTAB = PRC.NROTAB
       LEFT JOIN PRESTADOR P ON I.ID_PRESTADOR = P.ID_PRESTADOR
       LEFT JOIN CONVENIO C ON TR.ID_CONVENIO = C.NROCONV
+      LEFT JOIN (
+        SELECT NROTRA, SUM(CAST(VALOR AS FLOAT)) as totalPaid
+        FROM CCPACIENTE 
+        WHERE NROLAN IN ('6', '7', '8', '105')
+        GROUP BY NROTRA
+      ) FIN ON I.NROTRA = FIN.NROTRA
       LEFT JOIN (
         SELECT NROPAC, NROINTPAC, NRODEN, MAX(BITMAP) as BITMAP, MAX(FACE1) as FACE1, MAX(FACE2) as FACE2, MAX(FACE3) as FACE3, MAX(FACE4) as FACE4, MAX(FACE5) as FACE5
         FROM (
@@ -99,8 +106,33 @@ export async function GET(
       [id]
     );
 
+    // After fetching, calculate paidInstallments in JS for more flexibility
+    const processedInterventions = interventions.map(inter => {
+      const totalVal = parseFloat(inter.value) || 0;
+      
+      // Extract total installments from notes if not elsewhere
+      let totalInst = 1;
+      if (inter.notes && inter.notes.includes('(') && inter.notes.includes('x)')) {
+         const match = inter.notes.match(/\((\d+)x\)/);
+         if (match) totalInst = parseInt(match[1]) || 1;
+      }
+
+      const valPerInst = totalVal / totalInst;
+      const totalPaid = parseFloat(inter.totalPaid) || 0;
+      
+      // paidInstallments = Math.round(totalPaid / valPerInst)
+      const paidInst = valPerInst > 0 ? Math.round(totalPaid / valPerInst) : (totalPaid > 0 ? 1 : 0);
+
+      return {
+        ...inter,
+        installments: totalInst.toString(),
+        totalInstallments: totalInst,
+        paidInstallments: paidInst
+      };
+    });
+
     await db.close();
-    return NextResponse.json({ history, interventions });
+    return NextResponse.json({ history, interventions: processedInterventions });
   } catch (error: any) {
     console.error("API Error (History):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
