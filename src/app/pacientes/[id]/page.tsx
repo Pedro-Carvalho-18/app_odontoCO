@@ -355,8 +355,8 @@ function PatientProfileContent() {
                         value={editForm.professionalId || ""}
                         onChange={(e) => setEditForm({ ...editForm, professionalId: e.target.value })}
                       >
-                        {prestadores.map(p => (
-                          <option key={p.id} value={p.id}>{p.nome}</option>
+                        {catalogOptions.professionals.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
                     </div>
@@ -1222,7 +1222,7 @@ function PatientProfileContent() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-1 h-4 bg-purple-500 rounded-full" />
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Configurações de Atendimento</h4>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atendimento</h4>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div>

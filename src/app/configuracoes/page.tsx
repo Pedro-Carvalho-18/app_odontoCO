@@ -20,7 +20,10 @@ import {
   Plus,
   Search,
   Trash2,
-  X
+  X,
+  Download,
+  Upload,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +65,7 @@ export default function PerfilPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [specialties, setSpecialties] = useState<any[]>([]);
   const [newRowData, setNewRowData] = useState({ name: "", cro: "", specialtyId: "" });
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -203,7 +207,7 @@ export default function PerfilPage() {
 
   useEffect(() => {
     async function loadStats() {
-      if (activeTab === "banco") {
+      if (activeTab === "banco" || activeTab === "seguranca") {
         try {
           const res = await fetch("/api/health");
           const data = await res.json();
@@ -219,9 +223,42 @@ export default function PerfilPage() {
   }, [activeTab]);
 
   const handleExportBackup = () => {
-    alert("Exportando backup para suporte... (Este arquivo deverá ser enviado ao desenvolvedor)");
-    // Aqui poderíamos disparar o download direto do arquivo .sqlite
     window.open('/api/configuracoes/backup');
+  };
+
+  const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("AVISO: Importar um novo banco de dados irá substituir TODOS os dados atuais. Deseja continuar?")) {
+      e.target.value = "";
+      return;
+    }
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/configuracoes/import", {
+        method: "POST",
+        body: formData
+      });
+
+      if (res.ok) {
+        alert("Banco de dados importado com sucesso! O sistema será reiniciado.");
+        window.location.reload();
+      } else {
+        const error = await res.json();
+        alert(`Erro ao importar: ${error.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao enviar o arquivo.");
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
   };
 
   const menuItems = [
@@ -246,8 +283,9 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
-      <div className="flex items-center justify-between">
+    <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
+      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Configurações do Sistema</h1>
           <p className="text-slate-500">Gerencie suas informações pessoais e preferências.</p>
@@ -403,34 +441,109 @@ export default function PerfilPage() {
                    )}
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Support Info */}
-              <div className="bg-slate-900 rounded-[40px] p-8 text-white shadow-xl shadow-slate-200">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/10 rounded-2xl text-blue-400">
-                      <Shield size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black uppercase tracking-widest">Informações de Suporte</h3>
-                      <div className="flex gap-4 mt-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Versão do DB: <span className="text-white">{dbStats.version}</span></p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Sincronizado: <span className="text-white">{dbStats.lastApplied}</span></p>
-                      </div>
+          {activeTab === "seguranca" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Security Info Card */}
+              <div className="bg-slate-50 rounded-[40px] p-8 border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded-2xl text-blue-600 shadow-sm border border-slate-100">
+                    <Database size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Status do Banco de Dados</h3>
+                    <div className="flex gap-4 mt-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Versão: <span className="text-slate-900">{dbStats.version}</span></p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Último Acesso: <span className="text-slate-900">{dbStats.lastApplied}</span></p>
                     </div>
                   </div>
-                  <button 
-                    onClick={handleExportBackup}
-                    className="w-full sm:w-auto px-6 py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Database size={14} /> Exportar Banco (Suporte)
-                  </button>
+                </div>
+              </div>
+
+              {/* Backup & Security Card */}
+              <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                    <Shield size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Segurança e Backup</h2>
+                    <p className="text-sm text-slate-500">Gerencie a segurança dos seus dados e realize backups.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                  {/* Export Section */}
+                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-white rounded-2xl text-emerald-600 shadow-sm">
+                        <Download size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Baixar Banco de Dados</h3>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Crie uma cópia de segurança para levar seus dados.</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleExportBackup}
+                      className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Download size={14} /> Baixar Backup (.sqlite)
+                    </button>
+                  </div>
+
+                  {/* Import Section */}
+                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-white rounded-2xl text-blue-600 shadow-sm">
+                        <Upload size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Importar Banco de Dados</h3>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Restaure um backup ou migre de outra máquina.</p>
+                      </div>
+                    </div>
+                    <label className={cn(
+                      "w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2",
+                      importing && "opacity-50 pointer-events-none"
+                    )}>
+                      {importing ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" /> Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={14} /> Importar Arquivo
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept=".sqlite" 
+                        className="hidden" 
+                        onChange={handleImportDatabase}
+                        disabled={importing}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Warning Box */}
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
+                    <AlertTriangle className="text-amber-600 shrink-0" size={20} />
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase text-amber-900 tracking-widest">Aviso Importante</h4>
+                      <p className="text-[10px] font-bold text-amber-700 leading-relaxed uppercase mt-1">
+                        Ao importar um banco de dados, todos os dados atuais (pacientes, agendas, financeiro) serão substituídos permanentemente. Recomendamos fazer um backup antes de realizar esta operação.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab !== "perfil" && activeTab !== "clinica" && activeTab !== "banco" && (
+          {activeTab !== "perfil" && activeTab !== "clinica" && activeTab !== "banco" && activeTab !== "seguranca" && (
             <div className="bg-white rounded-[40px] border border-slate-200 p-12 shadow-sm flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
                 <Settings size={32} />
@@ -498,6 +611,7 @@ export default function PerfilPage() {
            </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

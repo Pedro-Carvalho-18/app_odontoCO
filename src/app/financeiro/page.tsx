@@ -513,7 +513,7 @@ export default function FinanceiroPage() {
                            t.type === 'income' ? "text-emerald-600" : 
                            t.type === 'expense' ? "text-rose-600" : "text-amber-500"
                          )}>
-                            {t.type === 'income' ? "+" : t.type === 'expense' ? "-" : "≈"} {formatCurrency(parseFloat(t.value))}
+                            {t.type === 'income' ? "+" : t.type === 'expense' ? "-" : ""} {formatCurrency(parseFloat(t.value))}
                          </span>
                       </td>
                       <td className="px-4 py-4 text-center">
@@ -796,7 +796,7 @@ export default function FinanceiroPage() {
                     selectedTransaction.type === 'income' ? "text-emerald-600" : 
                     selectedTransaction.type === 'expense' ? "text-rose-600" : "text-amber-500"
                   )}>
-                    {selectedTransaction.type === 'income' ? "+" : selectedTransaction.type === 'expense' ? "-" : "≈"} 
+                    {selectedTransaction.type === 'income' ? "+" : selectedTransaction.type === 'expense' ? "-" : ""} 
                     {formatCurrency(parseFloat(selectedTransaction.value))}
                   </p>
                 </div>
