@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.odontoco.app",
-    "productName": "OdontoCO",
+    "productName": "OdontOC",
     "directories": {
       "output": "dist"
     },
@@ -37,8 +37,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "OdontoCO",
-      "artifactName": "${productName}_Setup_${version}.${ext}"
+      "shortcutName": "OdontOC",
+      "artifactName": "${productName}_v${version}.${ext}"
     }
   },
   "dependencies": {
