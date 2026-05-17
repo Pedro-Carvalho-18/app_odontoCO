@@ -1,6 +1,6 @@
 {
   "name": "app_odonto",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Sistema de Gestão Odontológica OdontoCO",
   "author": "OdontoCO",
   "private": true,
@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "dist": "set CSC_SKIP_SIGN=true && set CSC_IDENTITY_AUTO_DISCOVERY=false && npm run build && electron-builder --win --portable",
+    "pre-dist": "npm run build && powershell -NoProfile -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/static; Copy-Item -Recurse -Force public .next/standalone/public\"",
+    "dist": "npm run pre-dist && electron-builder --win",
     "clean-cache": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force $env:LOCALAPPDATA\\electron-builder\\Cache\""
   },
   "build": {
@@ -21,16 +22,23 @@
       "output": "dist"
     },
     "files": [
-      "out/**/*",
+      ".next/standalone/**/*",
       "main.js",
       "database/app_odonto.sqlite",
-      "public/**/*",
       "Imagens/**/*"
     ],
     "win": {
-      "target": ["portable"],
+      "target": [
+        "nsis"
+      ],
       "icon": "Imagens/AppIcone.png",
-      "signingHashAlgorithms": []
+      "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "OdontoCO",
+      "artifactName": "${productName}_Setup_${version}.${ext}"
     }
   },
   "dependencies": {
