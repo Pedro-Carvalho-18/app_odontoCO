@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "pre-dist": "npm run build && powershell -NoProfile -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/static; Copy-Item -Recurse -Force public .next/standalone/public\"",
+    "pre-dist": "npm run build && powershell -NoProfile -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/static; Copy-Item -Recurse -Force public .next/standalone/public; if (Test-Path .next/standalone/node_modules) { Rename-Item -Path .next/standalone/node_modules -NewName next_modules -Force }\"",
     "dist": "npm run pre-dist && electron-builder --win",
     "clean-cache": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force $env:LOCALAPPDATA\\electron-builder\\Cache\""
   },
@@ -22,16 +22,22 @@
       "output": "dist"
     },
     "files": [
-      ".next/standalone/**/*",
       "main.js",
       "database/app_odonto.sqlite",
       "Imagens/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "Imagens/AppIcone.png",
+      "icon": "Imagens/icon.ico",
       "forceCodeSigning": false
     },
     "nsis": {
@@ -50,7 +56,8 @@
     "react-dom": "19.2.4",
     "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "wait-on": "^9.0.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -66,7 +73,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "wait-on": "^9.0.10"
+    "typescript": "^5"
   }
 }

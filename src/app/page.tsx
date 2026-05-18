@@ -619,7 +619,7 @@ export default function PatientRecordPage() {
   const upperJaw = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
   const lowerJaw = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
-  if (!selectedPatient && !loadingPatients) return <div className="p-20 text-center font-black uppercase text-slate-400">Carregando...</div>;
+  if (!initialLoadDone) return <div className="flex h-screen items-center justify-center font-black uppercase text-slate-400">Carregando...</div>;
 
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans">
@@ -688,24 +688,33 @@ export default function PatientRecordPage() {
            <div className="absolute top-4 left-6 flex items-center gap-2 text-slate-300">
               <Shield size={16} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">Odontograma</span>
            </div>
-           <div className="flex flex-col gap-2 w-full items-center my-auto">
-              <div className="flex justify-center items-end gap-1 flex-nowrap">
-                 {upperJaw.map((n, i) => (
-                   <div key={n} className="flex items-end gap-0.5 shrink-0">
-                      <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                      {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
-                   </div>
-                 ))}
+           
+           {!selectedPatient ? (
+              <div className="flex flex-col items-center justify-center text-slate-400 gap-4 mt-8">
+                 <User size={48} className="text-slate-200" />
+                 <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">Nenhum Paciente Selecionado</h2>
+                 <p className="text-[10px] font-bold">Use a barra de pesquisa acima para encontrar um paciente.</p>
               </div>
-              <div className="flex justify-center items-start gap-1 flex-nowrap">
-                 {lowerJaw.map((n, i) => (
-                   <div key={n} className="flex items-start gap-0.5 shrink-0">
-                      <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                      {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
-                   </div>
-                 ))}
-              </div>
-           </div>
+           ) : (
+             <div className="flex flex-col gap-2 w-full items-center my-auto">
+                <div className="flex justify-center items-end gap-1 flex-nowrap">
+                   {upperJaw.map((n, i) => (
+                     <div key={n} className="flex items-end gap-0.5 shrink-0">
+                        <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                        {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
+                     </div>
+                   ))}
+                </div>
+                <div className="flex justify-center items-start gap-1 flex-nowrap">
+                   {lowerJaw.map((n, i) => (
+                     <div key={n} className="flex items-start gap-0.5 shrink-0">
+                        <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                        {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
+                     </div>
+                   ))}
+                </div>
+             </div>
+           )}
         </div>
 
         <div className="h-[245px] bg-white rounded-[32px] border border-slate-200 shadow-sm flex flex-col overflow-hidden relative group">

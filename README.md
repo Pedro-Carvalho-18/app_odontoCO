@@ -20,10 +20,17 @@
 
 Bem-vindo ao **OdontOC**! O sistema foi projetado para rodar localmente na sua máquina, garantindo segurança total dos seus dados, sem mensalidades na nuvem.
 
-### 💿 Baixar o Instalador (Versão Completa)
-Para instalar o sistema na sua clínica pela primeira vez, baixe o executável abaixo. Ele instalará o sistema e criará o banco de dados inicial vazio para você começar.
+### 💿 Baixar o Instalador
 
-> **[🚀 Baixar Instalador OdontOC - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontOC_v1.0.0.exe)**
+Oferecemos duas versões do instalador para atender à sua necessidade:
+
+#### 1. Versão Limpa (Recomendada para Produção)
+Esta versão acompanha um banco de dados 100% limpo, sem pacientes ou transações de teste, pronta para o uso real e diário na sua clínica.
+> **[✨ Baixar OdontOC (Versão Limpa) - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontOC_Distrib_Clean.exe)**
+
+#### 2. Versão de Avaliação (Com Dados de Teste)
+Esta versão é preenchida com pacientes, agendamentos e orçamentos fictícios para que você possa explorar e testar todas as funcionalidades do sistema livremente antes de começar de verdade.
+> **[🧪 Baixar OdontOC (Avaliação) - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontOC_v1.0.0.exe)**
 
 **Como instalar:**
 1. Baixe o arquivo `.exe` acima.
