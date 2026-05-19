@@ -903,29 +903,29 @@ export default function PatientRecordPage() {
                   <div className="max-w-5xl mx-auto space-y-4">
                      
                      <div className="grid grid-cols-4 gap-3">
-                        <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Data</label><input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[12px] font-bold outline-none h-[44px]" /></div>
-                        <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Horário</label><input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[12px] font-bold outline-none h-[44px]" /></div>
-                        <div className="space-y-1.5 col-span-2"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Status</label>
-                           <div className="flex bg-white rounded-xl border border-slate-200 p-1 h-[44px]">
-                              <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[12px] font-bold rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:bg-slate-50")}>Pendente</button>
-                              <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[12px] font-bold rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-50")}>Concluído</button>
+                        <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Data</label><input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" /></div>
+                        <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Horário</label><input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" /></div>
+                        <div className="space-y-1.5 col-span-2"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Status</label>
+                           <div className="flex bg-white rounded-xl border border-slate-300 p-1 h-[48px]">
+                              <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-900" : "text-slate-500 hover:bg-slate-50")}>Pendente</button>
+                              <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-50")}>Concluído</button>
                            </div>
                         </div>
                      </div>
 
                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-[24px] border border-slate-200 space-y-3">
+                        <div className="bg-white p-4 rounded-[24px] border border-slate-300 shadow-sm space-y-3">
                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Dente / Região</label>
-                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[12px] font-black outline-none h-[44px]" />
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dente / Região</label>
+                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
                            </div>
                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Faces (Opcional)</label>
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Faces (Opcional)</label>
                               <div className="flex gap-2">
                                  {['top', 'bottom', 'left', 'right', 'center'].map((face) => {
                                     const labels: any = { top: 'V', bottom: 'L', left: 'D', right: 'M', center: 'O' };
                                     return (
-                                       <button key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[44px] rounded-xl text-[11px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:border-blue-400")}>{labels[face]}</button>
+                                       <button key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[48px] rounded-xl text-[12px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-300 text-slate-600 hover:border-blue-400")}>{labels[face]}</button>
                                     );
                                  })}
                               </div>
@@ -934,56 +934,56 @@ export default function PatientRecordPage() {
 
                         <div className="space-y-3">
                             <div className="space-y-1.5 relative">
-                               <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Profissional</label>
-                               <div className="bg-white border border-slate-200 rounded-xl">
-                                  <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[44px]">
-                                    <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isProfessionalExpanded ? "rotate-180" : "")} />
+                               <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Profissional</label>
+                               <div className="bg-white border border-slate-300 rounded-xl">
+                                  <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                    <p className="text-[13px] font-black text-slate-900 uppercase tracking-widest">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione..."}</p>
+                                    <ChevronDown size={18} className={cn("text-slate-600 transition-transform", isProfessionalExpanded ? "rotate-180" : "")} />
                                   </button>
                                </div>
                                {isProfessionalExpanded && (
-                                  <div className="absolute top-[56px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                     {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[11px] font-bold border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "hover:bg-slate-100")}>{p.name}</button>)}
+                                  <div className="absolute top-[60px] left-0 right-0 z-50 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                     {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "text-slate-900 hover:bg-slate-100")}>{p.name}</button>)}
                                   </div>
                                )}
                             </div>
                             <div className="space-y-1.5 relative">
-                               <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Convênio</label>
-                               <div className="bg-white border border-slate-200 rounded-xl">
-                                  <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[44px]">
-                                    <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isConvenioExpanded ? "rotate-180" : "")} />
+                               <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Convênio</label>
+                               <div className="bg-white border border-slate-300 rounded-xl">
+                                  <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                    <p className="text-[13px] font-black text-slate-900 uppercase tracking-widest">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Selecione..."}</p>
+                                    <ChevronDown size={18} className={cn("text-slate-600 transition-transform", isConvenioExpanded ? "rotate-180" : "")} />
                                   </button>
                                </div>
                                {isConvenioExpanded && (
-                                  <div className="absolute top-[56px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                     {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[11px] font-bold border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-800 text-white" : "hover:bg-slate-100")}>{c.name}</button>)}
+                                  <div className="absolute top-[60px] left-0 right-0 z-50 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                     {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100")}>{c.name}</button>)}
                                   </div>
                                )}
                             </div>
                         </div>
                      </div>
 
-                     <div className="bg-white p-4 rounded-[24px] border border-slate-200 space-y-4">
+                     <div className="bg-white p-4 rounded-[24px] border border-slate-300 shadow-sm space-y-4">
                         <div className="grid grid-cols-4 gap-3">
-                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Pagamento</label>
-                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none h-[44px]">
+                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Pagamento</label>
+                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[13px] font-black text-slate-900 outline-none h-[48px]">
                                  <option value="none">Sem Pagamento</option>
                                  {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                            </div>
-                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Recebimento</label>
-                              <div className="flex bg-slate-50 rounded-xl border border-slate-100 p-1 h-[44px]">
-                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[11px] font-bold rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-700" : "text-slate-400 hover:bg-slate-100")}>Pendente</button>
-                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[11px] font-bold rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-100")}>Pago</button>
+                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Recebimento</label>
+                              <div className="flex bg-slate-50 rounded-xl border border-slate-200 p-1 h-[48px]">
+                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-900" : "text-slate-500 hover:bg-slate-100")}>Pendente</button>
+                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-100")}>Pago</button>
                               </div>
                            </div>
-                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none h-[44px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
-                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 text-[14px] font-black text-emerald-600 outline-none h-[44px]" /></div>
+                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[13px] font-black text-slate-900 outline-none h-[48px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
+                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[16px] font-black text-emerald-700 outline-none h-[48px]" /></div>
                         </div>
                         <div className="space-y-1.5">
-                           <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Notas Técnicas / Observações</label>
-                           <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 text-[12px] font-medium h-24 outline-none resize-none focus:bg-white focus:border-blue-200 transition-all" />
+                           <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Notas Técnicas / Observações</label>
+                           <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-4 bg-slate-50 rounded-xl border border-slate-300 text-[14px] font-black text-slate-900 h-28 outline-none resize-none focus:bg-white focus:border-blue-300 transition-all placeholder:text-slate-300" />
                         </div>
                      </div>
                   </div>
