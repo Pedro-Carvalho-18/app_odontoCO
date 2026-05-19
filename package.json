@@ -1,6 +1,6 @@
 {
   "name": "app_odonto",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sistema de Gestão Odontológica OdontoCO",
   "author": "OdontoCO",
   "private": true,
@@ -44,7 +44,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "OdontOC",
-      "artifactName": "${productName}_v${version}.${ext}"
+      "artifactName": "OdontOC_Distrib_Clean_v${version}.${ext}"
     }
   },
   "dependencies": {
