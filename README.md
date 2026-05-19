@@ -46,12 +46,30 @@ Sempre estamos melhorando o OdontOC. Quando uma nova versão for lançada, você
 **Fique tranquilo:** Ao instalar uma atualização, **seus pacientes, orçamentos e agenda NUNCA serão apagados.** O sistema possui um motor inteligente de *Migração de Dados* que atualiza a estrutura mantendo tudo intacto.
 
 ### Versões Disponíveis:
+- 🔵 **v1.0.1 (Otimização 1080p & Melhorias Clínicas)** - *Ajustes de interface para alta resolução, melhorias no histórico e correção no receituário.* -> **[Baixar v1.0.1 (EXE)](dist/OdontOC_v1.0.0.exe)**
 - 🟢 **v1.0.0 (Lançamento Oficial)** - *Sistema completo de gestão, prontuário e financeiro.* -> **[Baixar v1.0.0](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontOC_v1.0.0.exe)**
 
 **Como atualizar:**
 1. Feche o aplicativo OdontOC caso esteja aberto.
-2. Baixe o arquivo de Update acima.
+2. Baixe o arquivo de Update acima (`OdontOC_v1.0.0.exe`).
 3. Instale normalmente (ele substituirá apenas o motor do sistema, mantendo seu banco de dados seguro).
+
+---
+
+## 🚀 Novidades da v1.0.1
+
+- **Otimização para 1080p:** 
+  - Desenho dos dentes e faces do odontograma ampliados para melhor visibilidade em monitores Full HD.
+  - Campos do modal de "Novo Lançamento" maiores e com melhor espaçamento.
+  - Aumento geral das fontes em movimentações, extratos e históricos para facilitar a leitura.
+- **Melhorias no Histórico Clínico:** 
+  - Agora o número do dente ou região é exibido automaticamente ao lado de cada procedimento na linha do tempo do paciente.
+  - Nome do paciente selecionado no cabeçalho do odontograma está mais proeminente.
+- **Receituário Inteligente:** 
+  - Correção na gravação de receitas (agora salva o nome do remédio, quantidade, modo de uso e observações).
+  - Visual reformulado: remoção de prefixos redundantes (`PROCEDIMENTO:`) e destaque azul em itálico para os medicamentos.
+  - Correção do erro que gerava lançamentos duplicados no prontuário ao emitir receitas.
+- **Estabilidade:** Correção do erro "getSpecialtyIcon is not defined".
 
 ---
 

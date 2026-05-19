@@ -26,7 +26,26 @@ import {
   Clock,
   User,
   Printer,
-  Pill
+  Pill,
+  Smile,
+  Layers,
+  Zap,
+  Droplets,
+  Scissors,
+  Grid,
+  ShieldCheck,
+  Baby,
+  Camera,
+  Syringe,
+  Eye,
+  Heart,
+  Maximize,
+  AlertCircle,
+  Gavel,
+  Microscope,
+  Stethoscope,
+  Scan,
+  Layout
 } from "lucide-react";
 import { cn, normalizeString } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -650,13 +669,13 @@ export default function PatientRecordPage() {
         <div className="flex items-center gap-2">
           {selectedPatient && (
             <>
-              <button onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-xl border border-slate-200 text-[10px] font-black uppercase hover:bg-slate-200 transition-colors" title="Ver Perfil do Paciente">
-                <User size={12} className="text-slate-500" />
-                {selectedPatient.name}
+              <button onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} className="flex items-center gap-2.5 px-4 py-2 bg-slate-100 rounded-xl border border-slate-200 text-[12px] font-black uppercase hover:bg-slate-200 transition-colors shadow-sm" title="Ver Perfil do Paciente">
+                <User size={16} className="text-blue-600" />
+                <span className="text-slate-800">{selectedPatient.name}</span>
               </button>
-              <div className="h-4 w-px bg-slate-200 mx-1" />
-              <button onClick={() => setShowFilesModal(true)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={18} /></button>
-              <button onClick={() => setShowPrescriptionModal(true)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><Pill size={18} /></button>
+              <div className="h-6 w-px bg-slate-200 mx-2" />
+              <button onClick={() => setShowFilesModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={20} /></button>
+              <button onClick={() => setShowPrescriptionModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><Pill size={20} /></button>
             </>
           )}
           <button 
@@ -696,20 +715,20 @@ export default function PatientRecordPage() {
                  <p className="text-[10px] font-bold">Use a barra de pesquisa acima para encontrar um paciente.</p>
               </div>
            ) : (
-             <div className="flex flex-col gap-2 w-full items-center my-auto">
-                <div className="flex justify-center items-end gap-1 flex-nowrap">
+             <div className="flex flex-col gap-6 w-full items-center my-auto">
+                <div className="flex justify-center items-end gap-1.5 flex-nowrap">
                    {upperJaw.map((n, i) => (
-                     <div key={n} className="flex items-end gap-0.5 shrink-0">
+                     <div key={n} className="flex items-end gap-1 shrink-0">
                         <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                        {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
+                        {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
                      </div>
                    ))}
                 </div>
-                <div className="flex justify-center items-start gap-1 flex-nowrap">
+                <div className="flex justify-center items-start gap-1.5 flex-nowrap">
                    {lowerJaw.map((n, i) => (
-                     <div key={n} className="flex items-start gap-0.5 shrink-0">
+                     <div key={n} className="flex items-start gap-1 shrink-0">
                         <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                        {i === 7 && <div className="w-px h-12 bg-slate-100 mx-2" />}
+                        {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
                      </div>
                    ))}
                 </div>
@@ -741,29 +760,43 @@ export default function PatientRecordPage() {
                   }
                 `}</style>
                  {history.filter(h => !h.procedure.includes("Alteração Odontograma")).map((item, idx) => (
-                   <div key={idx} onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} className="w-60 shrink-0 p-4 rounded-3xl border border-slate-100 bg-white flex flex-col gap-2 hover:shadow-xl transition-all cursor-pointer">
+                   <div key={idx} onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} className="w-72 shrink-0 p-5 rounded-3xl border border-slate-100 bg-white flex flex-col gap-3 hover:shadow-xl transition-all cursor-pointer">
                       <div className="flex justify-between items-start">
-                         <span className="text-[8px] font-black text-slate-400 uppercase">
+                         <span className="text-[10px] font-black text-slate-400 uppercase">
   {(() => {
     const [y, m, d] = item.date.split('-');
     return `${d}/${m}/${y}`;
   })()}
 </span>
-                         <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Dente {item.tooth}</span>
+                         <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Dente {item.tooth}</span>
                       </div>
-                      <h4 className="text-[10px] font-black text-slate-800 uppercase line-clamp-2 leading-tight min-h-[25px]">
-                        {item.procedure}
-                      </h4>                      <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-50">
+                      <div className="flex-1 min-h-[40px]">
+                        {item.procedure.includes("Receitado:") ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-blue-600">
+                              <FileText size={14} className="shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Receituário</span>
+                            </div>
+                            <p className="text-[12px] font-bold text-slate-700 leading-tight line-clamp-2 italic">
+                              {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()}
+                            </p>
+                          </div>
+                        ) : (
+                          <h4 className="text-[12px] font-black text-slate-800 uppercase line-clamp-2 leading-tight">
+                            {item.procedure}
+                          </h4>
+                        )}
+                      </div>                      <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-50">
                          <div className="flex flex-col">
-                            <span className="text-[7px] font-bold text-slate-500 uppercase truncate max-w-[80px]">{item.professional}</span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[100px]">{item.professional}</span>
                             <span className={cn(
-                               "text-[7px] font-black uppercase mt-0.5",
+                               "text-[9px] font-black uppercase mt-1",
                                (item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "text-emerald-600" : "text-rose-600"
                             )}>
                                {(item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "Pago Total" : `Pendente (${item.paidInstallments || 0}/${Number(item.totalInstallments || item.installments) || 1})`}
                             </span>
                          </div>
-                         <span className="text-[10px] font-black text-emerald-600">
+                         <span className="text-[12px] font-black text-emerald-600">
                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.numericValue || item.value)}
                          </span>
                       </div>
@@ -787,7 +820,7 @@ export default function PatientRecordPage() {
                <button onClick={() => setShowLaunchModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
             </div>
             <div className="flex-1 overflow-hidden flex">
-               <div className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+               <div className="w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
                   <div className="p-4 border-b border-slate-100 flex gap-2">
                      <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -866,89 +899,92 @@ export default function PatientRecordPage() {
                      })}
                   </div>
                </div>
-               <div className="flex-1 p-4 overflow-y-auto bg-slate-50">
-                  <div className="max-w-3xl mx-auto space-y-2">
+               <div className="flex-1 p-6 overflow-y-auto bg-slate-50">
+                  <div className="max-w-5xl mx-auto space-y-4">
                      
-                     <div className="grid grid-cols-4 gap-2">
-                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data</label><input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none h-[32px]" /></div>
-                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Horário</label><input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none h-[32px]" /></div>
-                        <div className="space-y-1 col-span-2"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
-                           <div className="flex bg-white rounded-xl border border-slate-200 p-1 h-[32px]">
-                              <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[10px] font-bold rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:bg-slate-50")}>Pendente</button>
-                              <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[10px] font-bold rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-50")}>Concluído</button>
+                     <div className="grid grid-cols-4 gap-3">
+                        <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Data</label><input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[12px] font-bold outline-none h-[44px]" /></div>
+                        <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Horário</label><input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-[12px] font-bold outline-none h-[44px]" /></div>
+                        <div className="space-y-1.5 col-span-2"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Status</label>
+                           <div className="flex bg-white rounded-xl border border-slate-200 p-1 h-[44px]">
+                              <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[12px] font-bold rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:bg-slate-50")}>Pendente</button>
+                              <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[12px] font-bold rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-50")}>Concluído</button>
                            </div>
                         </div>
                      </div>
 
-                     <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2">
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Dente / Região</label>
-                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black outline-none h-[32px]" />
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-[24px] border border-slate-200 space-y-3">
+                           <div className="space-y-1.5">
+                              <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Dente / Região</label>
+                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[12px] font-black outline-none h-[44px]" />
                            </div>
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Faces (Opcional)</label>
-                              <div className="flex gap-1.5">
+                           <div className="space-y-1.5">
+                              <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Faces (Opcional)</label>
+                              <div className="flex gap-2">
                                  {['top', 'bottom', 'left', 'right', 'center'].map((face) => {
                                     const labels: any = { top: 'V', bottom: 'L', left: 'D', right: 'M', center: 'O' };
                                     return (
-                                       <button key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[32px] rounded-xl text-[10px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:border-blue-400")}>{labels[face]}</button>
+                                       <button key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[44px] rounded-xl text-[11px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-200 text-slate-400 hover:border-blue-400")}>{labels[face]}</button>
                                     );
                                  })}
                               </div>
                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="space-y-1 relative">
-                               <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Profissional</label>
+                        <div className="space-y-3">
+                            <div className="space-y-1.5 relative">
+                               <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Profissional</label>
                                <div className="bg-white border border-slate-200 rounded-xl">
-                                  <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[32px]">
-                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={14} className={cn("text-slate-400 transition-transform", isProfessionalExpanded ? "rotate-180" : "")} />
+                                  <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[44px]">
+                                    <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione..."}</p>
+                                    <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isProfessionalExpanded ? "rotate-180" : "")} />
                                   </button>
                                </div>
                                {isProfessionalExpanded && (
-                                  <div className="absolute top-[44px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-48 overflow-y-auto rounded-xl p-1">
-                                     {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-2 rounded-lg text-[10px] font-bold border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "hover:bg-slate-100")}>{p.name}</button>)}
+                                  <div className="absolute top-[56px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                     {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[11px] font-bold border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "hover:bg-slate-100")}>{p.name}</button>)}
                                   </div>
                                )}
                             </div>
-                            <div className="space-y-1 relative">
-                               <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Convênio</label>
+                            <div className="space-y-1.5 relative">
+                               <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Convênio</label>
                                <div className="bg-white border border-slate-200 rounded-xl">
-                                  <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[32px]">
-                                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={14} className={cn("text-slate-400 transition-transform", isConvenioExpanded ? "rotate-180" : "")} />
+                                  <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[44px]">
+                                    <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Selecione..."}</p>
+                                    <ChevronDown size={16} className={cn("text-slate-400 transition-transform", isConvenioExpanded ? "rotate-180" : "")} />
                                   </button>
                                </div>
                                {isConvenioExpanded && (
-                                  <div className="absolute top-[44px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-48 overflow-y-auto rounded-xl p-1">
-                                     {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-2 rounded-lg text-[10px] font-bold border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-800 text-white" : "hover:bg-slate-100")}>{c.name}</button>)}
+                                  <div className="absolute top-[56px] left-0 right-0 z-50 bg-white border border-slate-200 shadow-xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                     {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[11px] font-bold border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-800 text-white" : "hover:bg-slate-100")}>{c.name}</button>)}
                                   </div>
                                )}
                             </div>
                         </div>
                      </div>
 
-                     <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2">
-                        <div className="grid grid-cols-4 gap-2">
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Pagamento</label>
-                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-bold outline-none h-[32px]">
+                     <div className="bg-white p-4 rounded-[24px] border border-slate-200 space-y-4">
+                        <div className="grid grid-cols-4 gap-3">
+                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Pagamento</label>
+                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none h-[44px]">
                                  <option value="none">Sem Pagamento</option>
                                  {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                            </div>
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Recebimento</label>
-                              <div className="flex bg-slate-50 rounded-xl border border-slate-100 p-1 h-[32px]">
-                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[9px] font-bold rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-700" : "text-slate-400 hover:bg-slate-100")}>Pendente</button>
-                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[9px] font-bold rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-100")}>Pago</button>
+                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Recebimento</label>
+                              <div className="flex bg-slate-50 rounded-xl border border-slate-100 p-1 h-[44px]">
+                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[11px] font-bold rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-700" : "text-slate-400 hover:bg-slate-100")}>Pendente</button>
+                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[11px] font-bold rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-700" : "text-slate-400 hover:bg-slate-100")}>Pago</button>
                               </div>
                            </div>
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-bold outline-none h-[32px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
-                           <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold text-slate-700 outline-none h-[32px]" /></div>
+                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none h-[44px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
+                           <div className="space-y-1.5"><label className="text-[11px] font-black text-slate-400 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 text-[14px] font-black text-emerald-600 outline-none h-[44px]" /></div>
                         </div>
-                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Notas técnicas..." className="w-full p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] h-10 outline-none resize-none" />
+                        <div className="space-y-1.5">
+                           <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Notas Técnicas / Observações</label>
+                           <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 text-[12px] font-medium h-24 outline-none resize-none focus:bg-white focus:border-blue-200 transition-all" />
+                        </div>
                      </div>
                   </div>
                </div>
@@ -1175,7 +1211,17 @@ export default function PatientRecordPage() {
                            });
                            if (!res.ok) throw new Error("Falha ao salvar arquivo");
                            
-                           const meds = prescriptionItems.map(i => i.medication).join(', ');
+                           // Collect all items: those already in the list + the current one if not empty
+                           let finalItems = [...prescriptionItems];
+                           if (prescriptionForm.medication) {
+                              finalItems.push({...prescriptionForm});
+                           }
+
+                           const meds = finalItems.map(i => {
+                              const obs = i.observations ? ` (${i.observations})` : "";
+                              return `${i.medication} - ${i.quantity || '1'} ${i.usage}${obs}`;
+                           }).join(', ');
+                           
                            const newItem = { 
                               id: Date.now(), 
                               type: 'history', 
@@ -1187,11 +1233,20 @@ export default function PatientRecordPage() {
                               numericValue: 0, 
                               notes: "Receita gerada e salva como arquivo." 
                            };
-                           setHistory(prev => [newItem, ...prev]);
+                           
+                           // Send to API to persist in clinical history
+                           await fetch(`/api/pacientes/${selectedPatient.id}/salvar`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ interventions: [newItem], odontogram: patientOdontograms[selectedPatient.id] || {} })
+                           });
+
+                           await fetchHistory(selectedPatient.id);
                            
                            alert("Prescrição gravada no prontuário e arquivo salvo com sucesso!");
                            setShowPrescriptionModal(false);
                            setPrescriptionItems([]);
+                           setPrescriptionForm({...prescriptionForm, medication: "", quantity: "", usage: "", observations: ""});
                            setPrescriptionStep('assistant');
                         } catch (err) {
                            console.error(err);

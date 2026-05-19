@@ -70,17 +70,17 @@ export function DetailedTooth({
 
   return (
     <div 
-      className={cn("flex flex-col items-center select-none w-[44px] shrink-0", className)}
+      className={cn("flex flex-col items-center select-none w-[58px] shrink-0", className)}
       onClick={() => onSelect?.(number)}
     >
       <span className={cn(
-        "text-[10px] font-black mb-0.5 transition-colors",
+        "text-[12px] font-black mb-1 transition-colors",
         isSelected ? "text-blue-600" : "text-slate-400"
       )}>{number}</span>
       
       <div 
         className={cn(
-          "relative w-[38px] h-[48px] flex items-center justify-center border transition-all p-1 cursor-pointer rounded-[10px] shadow-sm",
+          "relative w-[50px] h-[64px] flex items-center justify-center border transition-all p-1.5 cursor-pointer rounded-[12px] shadow-sm",
           isSelected ? "ring-2 ring-blue-500 ring-offset-1 z-20 scale-105" : "",
           safeStatus === "healthy" ? "bg-white border-slate-200" :
           safeStatus === "caries" ? "bg-rose-50 border-rose-200" :
@@ -91,7 +91,7 @@ export function DetailedTooth({
         onClick={cycleStatus}
       >
         {safeStatus === "absent" ? (
-          <div className="text-rose-500 font-black text-xl">X</div>
+          <div className="text-rose-500 font-black text-2xl">X</div>
         ) : (
           <div className="relative w-full h-full flex items-center justify-center">
             <img 
@@ -109,7 +109,7 @@ export function DetailedTooth({
       </div>
 
       {/* Professional Surface Selector (Odontogram Envelope) */}
-      <div className="mt-1.5 relative w-[34px] h-[34px] rounded-md overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0">
+      <div className="mt-2 relative w-[46px] h-[46px] rounded-lg overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0">
         <div 
           className={cn("absolute inset-0 transition-colors cursor-pointer", safeSurfaces.top ? "bg-blue-500" : "bg-slate-100 hover:bg-slate-200")}
           style={{ clipPath: "polygon(0 0, 100% 0, 70% 30%, 30% 30%)" }}

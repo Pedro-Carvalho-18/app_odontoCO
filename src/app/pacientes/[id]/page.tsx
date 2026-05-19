@@ -443,26 +443,30 @@ function PatientProfileContent() {
               ) : (
                 <>
                   <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Procedimento</p>
-                    <h4 className="text-lg font-bold text-slate-900 leading-tight">
-                      {selectedItem.procedure || "Procedimento sem descrição"}
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      {selectedItem.procedure.includes("Receitado:") ? "Receituário" : "Procedimento"}
+                    </p>
+                    <h4 className="text-xl font-bold text-slate-900 leading-tight italic">
+                      {selectedItem.procedure.includes("Receitado:") 
+                        ? selectedItem.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()
+                        : selectedItem.procedure || "Procedimento sem descrição"}
                     </h4>
                   </div>
 
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Profissional</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Profissional</p>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                          <User size={12} />
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                          <User size={16} />
                         </div>
-                        <p className="text-xs font-bold text-slate-700">{selectedItem.professional}</p>
+                        <p className="text-sm font-bold text-slate-700">{selectedItem.professional}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Procedimento</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Procedimento</p>
                       <span className={cn(
-                        "px-2 py-0.5 rounded text-[8px] font-black uppercase",
+                        "px-3 py-1 rounded text-[10px] font-black uppercase",
                         selectedItem.status === "Em Aberto" ? "bg-amber-100 text-amber-700" : 
                         selectedItem.status === "Cancelado" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
                       )}>
@@ -797,28 +801,45 @@ function PatientProfileContent() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('pt-BR')}</span>
+                            <span className="text-[11px] font-black text-slate-400 uppercase">{new Date(item.date).toLocaleDateString('pt-BR')}</span>
                             <div className="flex items-center gap-2">
                               {item.filesCount !== undefined && item.filesCount > 0 && (
-                                <div className="p-1 rounded-full bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                  <Paperclip size={12} />
+                                <div className="p-1.5 rounded-full bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                  <Paperclip size={14} />
                                 </div>
                               )}
                               <span className={cn(
-                                "px-2 py-0.5 rounded text-[8px] font-black uppercase",
+                                "px-2.5 py-1 rounded text-[10px] font-black uppercase",
                                 item.status === "Em Aberto" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
                               )}>
                                 {item.status}
                               </span>
                             </div>
                           </div>
-                          <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {item.procedure}
-                          </h4>
-                          <div className="flex items-center gap-4 mt-1">
-                            <p className="text-[10px] font-bold text-slate-500">Valor: R$ {item.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          {item.procedure.includes("Receitado:") ? (
+                            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 group-hover:border-blue-200 transition-all">
+                              <div className="flex items-center gap-2 text-blue-600 mb-1">
+                                <FileText size={18} className="shrink-0" />
+                                <span className="text-[11px] font-black uppercase tracking-widest">Receituário Emitido</span>
+                              </div>
+                              <p className="text-[15px] font-bold text-slate-700 leading-relaxed italic">
+                                {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()}
+                              </p>
+                            </div>
+                          ) : (
+                            <h4 className="text-[16px] font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                              {item.procedure}
+                              {item.tooth && (
+                                <span className="ml-2 text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
+                                  Dente {item.tooth}
+                                </span>
+                              )}
+                            </h4>
+                          )}
+                          <div className="flex items-center gap-4 mt-1.5">
+                            <p className="text-[11px] font-bold text-slate-500">Valor: R$ {item.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                             {item.paymentMethod && (
-                              <p className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded">
+                              <p className="text-[11px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded">
                                 {item.paymentMethod}
                               </p>
                             )}
@@ -906,10 +927,10 @@ function PatientProfileContent() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -928,8 +949,8 @@ function PatientProfileContent() {
                             return (
                               <tr key={inter.id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-6 py-4">
-                                  <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
+                                  <p className="text-sm font-black text-slate-900">{inter.procedure}</p>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center justify-center gap-2">
@@ -937,7 +958,7 @@ function PatientProfileContent() {
                                       type="number"
                                       min="0"
                                       max={totalInst || 1}
-                                      className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                      className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                       defaultValue={paidInst}
                                       onBlur={async (e) => {
                                         const newVal = parseInt(e.target.value);
@@ -1021,17 +1042,17 @@ function PatientProfileContent() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data do Lançamento</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição do Procedimento</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcela</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor da Parcela</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Data do Lançamento</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Descrição do Procedimento</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Parcela</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Valor da Parcela</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {history?.interventions.filter(i => (i.paidInstallments || 0) > 0).length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-sm">
                               Nenhuma parcela paga registrada
                             </td>
                           </tr>
@@ -1045,25 +1066,25 @@ function PatientProfileContent() {
                             for (let i = 1; i <= paidInst; i++) {
                               rows.push(
                                 <tr key={`${inter.id}-paid-${i}`} className="hover:bg-emerald-50/30 transition-colors">
-                                  <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                  <td className="px-6 py-4 text-sm font-bold text-slate-500">
                                     {new Date(inter.date).toLocaleDateString('pt-BR')}
                                   </td>
                                   <td className="px-6 py-4">
-                                    <p className="text-xs font-bold text-slate-900">{inter.procedure}</p>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">{inter.professional}</p>
+                                    <p className="text-sm font-bold text-slate-900">{inter.procedure}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">{inter.professional}</p>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase">
+                                    <span className="px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase">
                                       Parcela {i}/{totalInst}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 text-xs font-black text-emerald-600">
+                                  <td className="px-6 py-4 text-sm font-black text-emerald-600">
                                     R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-2 text-emerald-600">
                                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                      <span className="text-[9px] font-black uppercase">Recebido</span>
+                                      <span className="text-[10px] font-black uppercase">Recebido</span>
                                     </div>
                                   </td>
                                 </tr>

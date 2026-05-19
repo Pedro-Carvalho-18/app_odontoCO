@@ -31,8 +31,8 @@ export function Tooth({ number, className }: ToothProps) {
       className={cn("flex flex-col items-center gap-1 cursor-pointer transition-all", className)}
       onClick={handleClick}
     >
-      <span className="text-[10px] font-bold text-slate-400">{number}</span>
-      <svg width="36" height="44" viewBox="0 0 36 44" className="transition-colors">
+      <span className="text-[12px] font-bold text-slate-400">{number}</span>
+      <svg width="48" height="58" viewBox="0 0 36 44" className="transition-colors">
         {/* Simplified Tooth Shape */}
         <path 
           d="M18 2C10 2 4 6 4 14C4 22 8 28 10 38C10.5 41 12 42 14 42C16 42 17 40 18 38C19 40 20 42 22 42C24 42 25.5 41 26 38C28 28 32 22 32 14C32 6 26 2 18 2Z" 
