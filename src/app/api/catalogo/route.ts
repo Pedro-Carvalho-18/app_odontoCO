@@ -32,7 +32,7 @@ export async function GET() {
     const payments = await db.all(`SELECT REGISTRO as id, NOME as name FROM __TIPO_PAGTO ORDER BY NOME`);
 
     // 4. Get all professionals
-    const professionals = await db.all(`SELECT ID_PRESTADOR as id, NOME as name FROM PRESTADOR WHERE INATIVO = '0' OR INATIVO IS NULL ORDER BY NOME`);
+    const professionals = await db.all(`SELECT ID_PRESTADOR as id, NOME as name, CRO_PF as cro, CPF_PF as cpf FROM PRESTADOR WHERE INATIVO != 'S' OR INATIVO IS NULL ORDER BY NOME`);
 
     // 5. Get Convenios (Insurance)
     const convenios = await db.all(`SELECT NROCONV as id, NOME as name FROM CONVENIO WHERE INATIVO = '0' OR INATIVO IS NULL ORDER BY NOME`);
@@ -43,6 +43,9 @@ export async function GET() {
     // 7. Get Agenda Statuses
     const agendaStatuses = await db.all(`SELECT CODIGO as id, NOME as name, NROCOR as color FROM __STATUS_AGENDA ORDER BY CODIGO`);
 
+    // 8. Get Medical Certificate Reasons
+    const motivosAtestado = await db.all(`SELECT REGISTRO as id, CODIGO as code, NOME as name FROM __MOTIVO_ATESTADO ORDER BY NOME`);
+
     return NextResponse.json({
       specialties,
       procedures,
@@ -50,7 +53,8 @@ export async function GET() {
       professionals,
       convenios,
       unidades,
-      agendaStatuses
+      agendaStatuses,
+      motivosAtestado
     });
   } catch (error: any) {
     console.error("API Error (Catalog):", error);

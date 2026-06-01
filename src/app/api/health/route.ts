@@ -11,12 +11,15 @@ export async function GET() {
     
     // Pega informações básicas para mostrar no suporte
     const dbVersion = await db.get("SELECT versao FROM _SISTEMA_MIGRACOES ORDER BY id DESC LIMIT 1");
-    const dbSize = 0; // Poderia ser calculado via FS
+    
+    // Pega a data do último backup
+    const lastBackup = await db.get("SELECT timestamp FROM _SISTEMA_LOGS WHERE mensagem LIKE '%Backup%' ORDER BY id DESC LIMIT 1");
 
     return NextResponse.json({
       status: "online",
       version: "1.0.1",
       dbVersion: dbVersion?.versao || "1.0.0",
+      lastBackup: lastBackup?.timestamp || null,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {

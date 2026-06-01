@@ -13,6 +13,18 @@ export async function GET() {
 
     const fileBuffer = fs.readFileSync(dbPath);
     
+    // Registrar o backup no banco de dados para histórico
+    try {
+      const db = await getDb();
+      await db.run(
+        "INSERT INTO _SISTEMA_LOGS (nivel, mensagem, contexto, timestamp) VALUES (?, ?, ?, ?)",
+        ["INFO", "Backup do banco de dados realizado pelo usuário", "SISTEMA", new Date().toISOString()]
+      );
+    } catch (logError) {
+      console.error("Erro ao registrar log de backup:", logError);
+      // Não trava o download se o log falhar
+    }
+
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": "application/vnd.sqlite3",

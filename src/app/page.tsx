@@ -41,7 +41,7 @@ import {
   Heart,
   Maximize,
   AlertCircle,
-  Gavel,
+  FileBadge,
   Microscope,
   Stethoscope,
   Scan,
@@ -203,6 +203,7 @@ export default function PatientRecordPage() {
   const [discountValue, setDiscountValue] = useState("");
   const [showLaunchModal, setShowLaunchModal] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [showAtestadoModal, setShowAtestadoModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [initialFilesIntervention, setInitialFilesIntervention] = useState<string | undefined>(undefined);
   const [prescriptionText, setPrescriptionText] = useState("");
@@ -222,6 +223,20 @@ export default function PatientRecordPage() {
   });
   const [prescriptionItems, setPrescriptionItems] = useState<any[]>([]);
   const [finalPrescriptionText, setFinalPrescriptionText] = useState("");
+
+  // States for Atestado Workflow
+  const [atestadoStep, setAtestadoStep] = useState<'assistant' | 'editor'>('assistant');
+  const [atestadoForm, setAtestadoForm] = useState({
+    professionalId: "1",
+    motivoId: "1",
+    periodoInicio: new Date().toISOString().split('T')[0],
+    periodoFim: new Date().toISOString().split('T')[0],
+    horarioInicio: "08:00",
+    horarioFim: "09:00",
+    observacoes: "",
+    usaHorario: true
+  });
+  const [finalAtestadoText, setFinalAtestadoText] = useState("");
   const [medicationsDB, setMedicationsDB] = useState<{ 
     code: number; 
     name: string;
@@ -674,17 +689,14 @@ export default function PatientRecordPage() {
                 <span className="text-slate-800">{selectedPatient.name}</span>
               </button>
               <div className="h-6 w-px bg-slate-200 mx-2" />
-              <button onClick={() => setShowFilesModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={20} /></button>
+              <button onClick={() => setShowLaunchModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Novo Lançamento"><Stethoscope size={20} /></button>
               <button onClick={() => setShowPrescriptionModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><Pill size={20} /></button>
-            </>
-          )}
-          <button 
-            onClick={() => setShowLaunchModal(true)} 
-            className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all"
-            title="Novo Lançamento"
-          >
-            <FileEdit size={18} />
-          </button>
+              </>
+              )}
+              <button onClick={() => setShowAtestadoModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Gerar Atestado"><FileEdit size={20} /></button>
+              {selectedPatient && (
+                <button onClick={() => setShowFilesModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={20} /></button>
+              )}
           
           <div className="h-4 w-px bg-slate-200 mx-1" />
 
@@ -1253,6 +1265,226 @@ export default function PatientRecordPage() {
                            alert("Erro ao salvar arquivo da receita.");
                         }
                      }} className="px-10 py-4 rounded-2xl font-black text-[10px] uppercase bg-rose-600 text-white shadow-lg hover:bg-rose-700">
+                        Gravar no Prontuário
+                     </button>
+                  </div>
+               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showAtestadoModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-0 animate-in fade-in duration-300">
+          <div className="bg-slate-50 w-full h-full flex flex-col">
+            <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 text-white rounded-xl"><FileBadge size={20} /></div>
+                  <h3 className="text-sm font-black uppercase">
+                     {atestadoStep === 'assistant' ? 'Assistente de Atestados' : 'Editor de Atestados'}
+                  </h3>
+               </div>
+               <button onClick={() => setShowAtestadoModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
+            </div>
+            
+            {atestadoStep === 'assistant' && (
+               <div className="flex-1 overflow-hidden flex items-center justify-center bg-slate-100 p-8">
+                  <div className="w-full max-w-2xl bg-white shadow-xl rounded-[32px] overflow-hidden flex flex-col border border-slate-200">
+                     <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="grid grid-cols-2 gap-4">
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cirurgião</label>
+                              <select 
+                                 value={atestadoForm.professionalId} 
+                                 onChange={(e) => setAtestadoForm({...atestadoForm, professionalId: e.target.value})}
+                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                              >
+                                 {catalogData?.professionals?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                              </select>
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Motivo</label>
+                              <select 
+                                 value={atestadoForm.motivoId} 
+                                 onChange={(e) => setAtestadoForm({...atestadoForm, motivoId: e.target.value})}
+                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                              >
+                                 {catalogData?.motivosAtestado?.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                              </select>
+                           </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paciente</label>
+                           <input type="text" value={selectedPatient?.name || ""} disabled className="w-full p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-black outline-none" />
+                        </div>
+
+                        <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-200 space-y-4">
+                           <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Período / Horário</h4>
+                              <label className="flex items-center gap-2 text-[10px] font-black text-slate-600 cursor-pointer">
+                                 <input type="checkbox" checked={atestadoForm.usaHorario} onChange={e => setAtestadoForm({...atestadoForm, usaHorario: e.target.checked})} className="w-4 h-4 rounded" />
+                                 Incluir Horários
+                              </label>
+                           </div>
+                           
+                           <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Início</label>
+                                 <input type="date" value={atestadoForm.periodoInicio} onChange={e => setAtestadoForm({...atestadoForm, periodoInicio: e.target.value})} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" />
+                              </div>
+                              <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fim</label>
+                                 <input type="date" value={atestadoForm.periodoFim} onChange={e => setAtestadoForm({...atestadoForm, periodoFim: e.target.value})} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" />
+                              </div>
+                           </div>
+
+                           {atestadoForm.usaHorario && (
+                              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                                 <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Das</label>
+                                    <input type="time" value={atestadoForm.horarioInicio} onChange={e => setAtestadoForm({...atestadoForm, horarioInicio: e.target.value})} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" />
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Até às</label>
+                                    <input type="time" value={atestadoForm.horarioFim} onChange={e => setAtestadoForm({...atestadoForm, horarioFim: e.target.value})} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" />
+                                 </div>
+                              </div>
+                           )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observações Adicionais</label>
+                           <textarea 
+                              value={atestadoForm.observacoes} 
+                              onChange={(e) => setAtestadoForm({...atestadoForm, observacoes: e.target.value})}
+                              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none h-24 resize-none focus:bg-white transition-all"
+                              placeholder="Alguma observação específica para este atestado?"
+                           />
+                        </div>
+                     </div>
+                     <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 shrink-0">
+                        <button onClick={() => setShowAtestadoModal(false)} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Cancelar</button>
+                        <button onClick={() => {
+                           const professional = catalogData?.professionals?.find(p => p.id === atestadoForm.professionalId);
+                           const profName = professional?.name || "Profissional";
+                           const profCro = professional?.cro || "";
+                           
+                           const motivo = catalogData?.motivosAtestado?.find((m: any) => m.id === atestadoForm.motivoId)?.name || "Tratamento Odontológico";
+                           
+                           const dtIni = new Date(atestadoForm.periodoInicio).toLocaleDateString('pt-BR');
+                           const dtFim = new Date(atestadoForm.periodoFim).toLocaleDateString('pt-BR');
+                           
+                           let periodoStr = dtIni === dtFim ? `no dia ${dtIni}` : `no período de ${dtIni} a ${dtFim}`;
+                           let horarioStr = atestadoForm.usaHorario ? `, no horário das ${atestadoForm.horarioInicio} às ${atestadoForm.horarioFim}` : "";
+                           
+                           let docText = `Consultório Odontológico\nAl. Rogério Pinto Ferráz 257\n14802-362 - Araraquara - SP\n\n\n`;
+                           docText += `ATESTADO ODONTOLÓGICO\n\n\n`;
+                           docText += `Atesto para os devidos fins de direito, que o(a) Sr(a). ${selectedPatient?.name}, esteve sob meus cuidados profissionais ${periodoStr}${horarioStr}, por motivo de ${motivo.toLowerCase()}, estando sob minha responsabilidade.\n\n`;
+                           
+                           if (atestadoForm.observacoes) {
+                              docText += `Observações: ${atestadoForm.observacoes}\n\n`;
+                           }
+
+                           const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+                           docText += `\nAraraquara, ${today}\n\n\n`;
+                           docText += `___________________________________\n`;
+                           docText += `${profName}\n`;
+                           if (profCro) docText += `CRO ${profCro}\n`;
+                           
+                           docText += `\n\n___________________________________\n`;
+                           docText += `${selectedPatient?.name}\n\n\n`;
+                           
+                           docText += `LEI FEDERAL 5.081 de 24/08/66, Art. 6º "Compete ao Cirurgião-Dentista... III - atestar, no setor de sua atividade profissional, estados mórbidos e outros, inclusive para justificação de faltas ao emprego". (com a modificação prevista pela Lei Federal 6.215, de 30/06/75).`;
+                           
+                           setFinalAtestadoText(docText);
+                           setAtestadoStep('editor');
+                        }} className="px-10 py-3 rounded-2xl font-black text-[10px] uppercase bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all">Gerar Atestado</button>
+                     </div>
+                  </div>
+               </div>
+            )}
+
+            {atestadoStep === 'editor' && (
+               <div className="flex-1 overflow-hidden flex flex-col bg-slate-200 p-8 items-center">
+                  <div className="w-full max-w-4xl bg-white shadow-2xl flex-1 rounded-sm border border-slate-300 flex flex-col overflow-hidden">
+                     <div className="h-12 bg-slate-100 border-b border-slate-300 flex items-center px-4 gap-4 text-xs font-bold text-slate-600">
+                        <div className="flex gap-2">
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Arquivo</button>
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Editar</button>
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Formatar</button>
+                        </div>
+                        <div className="w-px h-6 bg-slate-300" />
+                        <div className="flex gap-2 items-center">
+                           <span className="font-serif">Times New Roman</span>
+                           <span className="font-serif">12</span>
+                           <div className="w-4 h-4 bg-black rounded-sm" />
+                        </div>
+                     </div>
+                     <div className="flex-1 p-20 overflow-y-auto bg-white">
+                        <textarea 
+                           value={finalAtestadoText}
+                           onChange={(e) => setFinalAtestadoText(e.target.value)}
+                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center"
+                           spellCheck="false"
+                        />
+                     </div>
+                  </div>
+               </div>
+            )}
+
+            {atestadoStep === 'editor' && (
+               <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between shadow-2xl">
+                  <button onClick={() => setAtestadoStep('assistant')} className="px-6 py-4 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Voltar ao Assistente</button>
+                  <div className="flex gap-4">
+                     <button onClick={() => {
+                        window.print();
+                     }} className="px-8 py-4 rounded-2xl font-black text-[10px] uppercase bg-slate-800 text-white shadow-lg flex items-center gap-2 hover:bg-slate-900">
+                        <Printer size={16} /> Imprimir
+                     </button>
+                     <button onClick={async () => {
+                        if (!selectedPatient || !finalAtestadoText) return;
+                        
+                        try {
+                           const res = await fetch(`/api/pacientes/${selectedPatient.id}/salvar-atestado`, { 
+                              method: 'POST', 
+                              headers: { 'Content-Type': 'application/json' }, 
+                              body: JSON.stringify({ text: finalAtestadoText }) 
+                           });
+                           if (!res.ok) throw new Error("Falha ao salvar arquivo");
+                           
+                           const motivo = catalogData?.motivosAtestado?.find((m: any) => m.id === atestadoForm.motivoId)?.name || "Tratamento";
+                           const dtIni = new Date(atestadoForm.periodoInicio).toLocaleDateString('pt-BR');
+                           const resumo = `Atestado: dia ${dtIni} por motivo de ${motivo}`;
+
+                           const newItem = { 
+                              id: Date.now(), 
+                              type: 'history', 
+                              date: new Date().toISOString(), 
+                              procedure: resumo, 
+                              status: "Concluído", 
+                              professional: catalogData?.professionals?.find(p => p.id === atestadoForm.professionalId)?.name || "Sistema", 
+                              value: "R$ 0,00", 
+                              numericValue: 0, 
+                              notes: "Atestado gerado e salvo como arquivo." 
+                           };
+                           
+                           await fetch(`/api/pacientes/${selectedPatient.id}/salvar`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ interventions: [newItem], odontogram: patientOdontograms[selectedPatient.id] || {} })
+                           });
+
+                           await fetchHistory(selectedPatient.id);
+                           
+                           alert("Atestado gravado no prontuário e arquivo salvo com sucesso!");
+                           setShowAtestadoModal(false);
+                           setAtestadoStep('assistant');
+                        } catch (err) {
+                           console.error(err);
+                           alert("Erro ao salvar arquivo do atestado.");
+                        }
+                     }} className="px-10 py-4 rounded-2xl font-black text-[10px] uppercase bg-emerald-600 text-white shadow-lg hover:bg-emerald-700">
                         Gravar no Prontuário
                      </button>
                   </div>

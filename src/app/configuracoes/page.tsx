@@ -20,10 +20,13 @@ import {
   Plus,
   Search,
   Trash2,
+  Edit2,
   X,
   Download,
   Upload,
-  AlertTriangle
+  AlertTriangle,
+  Pill,
+  DollarSign
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,9 +66,24 @@ export default function PerfilPage() {
   const [dbLoading, setDbLoading] = useState(false);
   const [dbSearch, setDbSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [specialties, setSpecialties] = useState<any[]>([]);
-  const [newRowData, setNewRowData] = useState({ name: "", cro: "", specialtyId: "" });
-  const [importing, setImporting] = useState(false);
+  
+  const initialRowData = { 
+    name: "", 
+    cro: "", 
+    specialtyId: "", 
+    price: "",
+    quantityAdult: "",
+    posologyAdult: "",
+    quantityChild: "",
+    posologyChild: "",
+    usage: ""
+  };
+  const [newRowData, setNewRowData] = useState(initialRowData);
+  
+  const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
+  const [importErrorMessage, setImportErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadInitialData() {
@@ -107,7 +125,6 @@ export default function PerfilPage() {
         if (specRes.ok) {
           const specData = await specRes.json();
           setSpecialties(specData);
-          setNewRowData(prev => ({ ...prev, specialtyId: specData[0]?.id || "1" }));
         }
       } catch (err) {
         console.error("Failed to load initial data:", err);
@@ -165,18 +182,27 @@ export default function PerfilPage() {
     } catch (err) { console.error(err); } finally { setSaving(false); }
   };
 
-  const handleAddRow = async () => {
+  const handleSaveRow = async () => {
     if (!newRowData.name) return;
     setSaving(true);
     try {
+      const method = editingId ? "PUT" : "POST";
+      const body: any = { table: dbTable, data: {
+        ...newRowData,
+        price: parseFloat(newRowData.price.replace(/[^\d,]/g, '').replace(',', '.')) || 0
+      }};
+      if (editingId) body.id = editingId;
+
       const res = await fetch("/api/configuracoes/db-manager", {
-        method: "POST",
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: dbTable, data: newRowData })
+        body: JSON.stringify(body)
       });
+      
       if (res.ok) {
         setShowAddModal(false);
-        setNewRowData({ name: "", cro: "", specialtyId: specialties[0]?.id || "1" });
+        setEditingId(null);
+        setNewRowData(initialRowData);
         fetchDbData();
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
@@ -203,7 +229,23 @@ export default function PerfilPage() {
     }
   };
 
-  const [dbStats, setDbLoadingStats] = useState({ version: "---", lastApplied: "---", logs: 0 });
+  const handleEditRow = (item: any) => {
+    setEditingId(item.id);
+    setNewRowData({
+      name: item.name || "",
+      cro: item.cro || "",
+      specialtyId: item.specialtyId || specialties[0]?.id || "1",
+      price: item.price ? item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : "R$ 0,00",
+      quantityAdult: item.quantityAdult || "",
+      posologyAdult: item.posologyAdult || "",
+      quantityChild: item.quantityChild || "",
+      posologyChild: item.posologyChild || "",
+      usage: item.usage || ""
+    });
+    setShowAddModal(true);
+  };
+
+  const [dbStats, setDbLoadingStats] = useState({ version: "---", lastApplied: "---", lastBackup: null as string | null, logs: 0 });
 
   useEffect(() => {
     async function loadStats() {
@@ -214,6 +256,7 @@ export default function PerfilPage() {
           setDbLoadingStats({
             version: data.dbVersion,
             lastApplied: new Date(data.timestamp).toLocaleDateString('pt-BR'),
+            lastBackup: data.lastBackup,
             logs: 0 // Simplificado
           });
         } catch (err) { console.error(err); }
@@ -224,6 +267,14 @@ export default function PerfilPage() {
 
   const handleExportBackup = () => {
     window.open('/api/configuracoes/backup');
+    // Forçar atualização da data após o download (com um pequeno delay)
+    setTimeout(() => {
+      fetch("/api/health")
+        .then(res => res.json())
+        .then(data => {
+          setDbLoadingStats(prev => ({ ...prev, lastBackup: data.lastBackup }));
+        });
+    }, 2000);
   };
 
   const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,7 +286,7 @@ export default function PerfilPage() {
       return;
     }
 
-    setImporting(true);
+    setImportStatus("importing");
     const formData = new FormData();
     formData.append("file", file);
 
@@ -246,17 +297,23 @@ export default function PerfilPage() {
       });
 
       if (res.ok) {
-        alert("Banco de dados importado com sucesso! O sistema será reiniciado.");
-        window.location.reload();
+        setImportStatus("success");
+        // Aguarda 2 segundos para o usuário ver o sucesso antes de reiniciar
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       } else {
         const error = await res.json();
-        alert(`Erro ao importar: ${error.error}`);
+        setImportErrorMessage(error.error || "Erro desconhecido");
+        setImportStatus("error");
+        setTimeout(() => setImportStatus("idle"), 5000);
       }
     } catch (err) {
       console.error(err);
-      alert("Erro ao enviar o arquivo.");
+      setImportErrorMessage("Erro ao enviar o arquivo.");
+      setImportStatus("error");
+      setTimeout(() => setImportStatus("idle"), 5000);
     } finally {
-      setImporting(false);
       e.target.value = "";
     }
   };
@@ -271,8 +328,16 @@ export default function PerfilPage() {
   const filteredDbData = dbData.filter(item => 
     item.name?.toLowerCase().includes(dbSearch.toLowerCase()) ||
     item.id?.toString().includes(dbSearch) ||
-    item.cro?.toLowerCase().includes(dbSearch.toLowerCase())
+    item.cro?.toLowerCase().includes(dbSearch.toLowerCase()) ||
+    item.specialty?.toLowerCase().includes(dbSearch.toLowerCase())
   );
+
+  const formatCurrency = (val: string) => {
+    const numeric = val.replace(/\D/g, "");
+    if (!numeric) return "R$ 0,00";
+    const float = parseFloat(numeric) / 100;
+    return float.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
 
   if (loading) {
     return (
@@ -284,7 +349,7 @@ export default function PerfilPage() {
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div className="max-w-7xl mx-auto space-y-8 pb-12">
         <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Configurações do Sistema</h1>
@@ -386,7 +451,7 @@ export default function PerfilPage() {
                     <button onClick={() => setDbTable("procedimentos")} className={cn("px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all", dbTable === "procedimentos" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50")}>Procedimentos</button>
                     <button onClick={() => setDbTable("dentistas")} className={cn("px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all", dbTable === "dentistas" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50")}>Dentistas</button>
                   </div>
-                  <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95">
+                  <button onClick={() => { setEditingId(null); setNewRowData(initialRowData); setShowAddModal(true); }} className="flex items-center justify-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95">
                     <Plus size={14} /> Adicionar
                   </button>
                 </div>
@@ -412,27 +477,56 @@ export default function PerfilPage() {
                      <table className="w-full text-left">
                         <thead className="bg-slate-50 sticky top-0 z-10">
                            <tr className="border-b border-slate-100">
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ID</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome / Descrição</th>
-                              {dbTable === "dentistas" && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">CRO</th>}
-                              {dbTable === "procedimentos" && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidade</th>}
-                              <th className="px-6 py-4"></th>
+                              <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">ID</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Nome / Descrição</th>
+                              {dbTable === "dentistas" && <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">CRO</th>}
+                              {dbTable === "procedimentos" && (
+                                <>
+                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Especialidade</th>
+                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
+                                </>
+                              )}
+                              {dbTable === "medicamentos" && <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Dosagem Padrão</th>}
+                              <th className="px-2 py-4"></th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                            {filteredDbData.map(item => (
-                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
-                                <td className="px-6 py-4 text-xs font-bold text-slate-400">{item.id}</td>
-                                <td className="px-6 py-4 text-xs font-black text-slate-700 uppercase">{item.name}</td>
-                                {dbTable === "dentistas" && <td className="px-6 py-4 text-xs font-bold text-slate-500">{item.cro || "---"}</td>}
-                                {dbTable === "procedimentos" && <td className="px-6 py-4 text-xs font-bold text-slate-500">{item.specialty || "Geral"}</td>}
-                                <td className="px-6 py-4 text-right">
-                                   <button 
-                                      onClick={() => handleDeleteRow(item.id)}
-                                      className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                                   >
-                                      <Trash2 size={14} />
-                                   </button>
+                             <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
+                                <td className="px-6 py-4 text-[10px] font-bold text-slate-400">{item.id}</td>
+                                <td className="px-6 py-4 text-[11px] font-black text-slate-700 uppercase">{item.name}</td>
+                                {dbTable === "dentistas" && <td className="px-6 py-4 text-[11px] font-bold text-slate-500">{item.cro || "---"}</td>}
+                                {dbTable === "procedimentos" && (
+                                  <>
+                                    <td className="px-6 py-4 text-[11px] font-bold text-slate-500">{item.specialty || "Geral"}</td>
+                                    <td className="px-6 py-4 text-[11px] font-black text-emerald-600">
+                                      {item.price?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </td>
+                                  </>
+                                )}
+                                {dbTable === "medicamentos" && (
+                                  <td className="px-6 py-4 text-[9px] font-bold text-slate-400 uppercase">
+                                    {item.quantityAdult ? `A: ${item.quantityAdult}` : ""} {item.quantityChild ? `| C: ${item.quantityChild}` : ""}
+                                    {!item.quantityAdult && !item.quantityChild && "---"}
+                                  </td>
+                                )}
+                                <td className="px-2 py-4 text-left whitespace-nowrap">
+                                   <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditRow(item)}
+                                        className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                        title="Editar"
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button 
+                                          onClick={() => handleDeleteRow(item.id)}
+                                          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                          title="Excluir"
+                                      >
+                                          <Trash2 size={13} />
+                                      </button>
+                                   </div>
                                 </td>
                              </tr>
                            ))}
@@ -446,7 +540,7 @@ export default function PerfilPage() {
 
           {activeTab === "seguranca" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              {/* Security Info Card */}
+              {/* Security Info Card ... rest same as before ... */}
               <div className="bg-slate-50 rounded-[40px] p-8 border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white rounded-2xl text-blue-600 shadow-sm border border-slate-100">
@@ -462,7 +556,6 @@ export default function PerfilPage() {
                 </div>
               </div>
 
-              {/* Backup & Security Card */}
               <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
@@ -475,7 +568,6 @@ export default function PerfilPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Export Section */}
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-white rounded-2xl text-emerald-600 shadow-sm">
@@ -494,7 +586,6 @@ export default function PerfilPage() {
                     </button>
                   </div>
 
-                  {/* Import Section */}
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-white rounded-2xl text-blue-600 shadow-sm">
@@ -506,29 +597,20 @@ export default function PerfilPage() {
                       </div>
                     </div>
                     <label className={cn(
-                      "w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2",
-                      importing && "opacity-50 pointer-events-none"
+                      "w-full sm:w-auto px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2",
+                      importStatus === "idle" && "bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700",
+                      importStatus === "importing" && "bg-blue-400 text-white opacity-50 pointer-events-none",
+                      importStatus === "success" && "bg-emerald-600 text-white shadow-lg shadow-emerald-100 pointer-events-none",
+                      importStatus === "error" && "bg-rose-600 text-white shadow-lg shadow-rose-100 pointer-events-none"
                     )}>
-                      {importing ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin" /> Processando...
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={14} /> Importar Arquivo
-                        </>
-                      )}
-                      <input 
-                        type="file" 
-                        accept=".sqlite" 
-                        className="hidden" 
-                        onChange={handleImportDatabase}
-                        disabled={importing}
-                      />
+                      {importStatus === "idle" && <><Upload size={14} /> Importar Arquivo</>}
+                      {importStatus === "importing" && <><Loader2 size={14} className="animate-spin" /> Processando...</>}
+                      {importStatus === "success" && <><CheckCircle2 size={14} /> Sucesso! Reiniciando...</>}
+                      {importStatus === "error" && <><X size={14} /> {importErrorMessage || "Erro"}</>}
+                      <input type="file" accept=".sqlite" className="hidden" onChange={handleImportDatabase} disabled={importStatus !== "idle"} />
                     </label>
                   </div>
 
-                  {/* Warning Box */}
                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
                     <AlertTriangle className="text-amber-600 shrink-0" size={20} />
                     <div>
@@ -557,15 +639,19 @@ export default function PerfilPage() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+           <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
               <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-900 text-white rounded-xl"><Plus size={18} /></div>
-                    <h3 className="text-sm font-black uppercase text-slate-900">Novo em {dbTable}</h3>
+                    <div className="p-2 bg-slate-900 text-white rounded-xl">
+                      {editingId ? <Edit2 size={18} /> : <Plus size={18} />}
+                    </div>
+                    <h3 className="text-sm font-black uppercase text-slate-900">
+                      {editingId ? `Editar ${dbTable === 'medicamentos' ? 'Medicamento' : dbTable === 'procedimentos' ? 'Procedimento' : 'Dentista'}` : `Novo em ${dbTable}`}
+                    </h3>
                  </div>
-                 <button onClick={() => setShowAddModal(false)} className="p-2 text-slate-400 hover:text-rose-500"><X size={24} /></button>
+                 <button onClick={() => setShowAddModal(false)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><X size={24} /></button>
               </div>
-              <div className="p-8 space-y-4">
+              <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome / Descrição</label>
                     <input 
@@ -576,6 +662,7 @@ export default function PerfilPage() {
                       autoFocus
                     />
                  </div>
+
                  {dbTable === "dentistas" && (
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número do CRO</label>
@@ -587,25 +674,80 @@ export default function PerfilPage() {
                       />
                    </div>
                  )}
+
                  {dbTable === "procedimentos" && (
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Especialidade</label>
-                      <select 
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-sm" 
-                        value={newRowData.specialtyId}
-                        onChange={e => setNewRowData({...newRowData, specialtyId: e.target.value})}
-                      >
-                        {specialties.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Especialidade / Categoria</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-sm" 
+                          value={newRowData.specialtyId}
+                          onChange={e => setNewRowData({...newRowData, specialtyId: e.target.value})}
+                        >
+                          <option value="">Selecione...</option>
+                          {specialties.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor do Procedimento</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
+                          <input 
+                            type="text" 
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 font-black text-sm text-emerald-700" 
+                            value={newRowData.price}
+                            onChange={e => setNewRowData({...newRowData, price: formatCurrency(e.target.value)})}
+                          />
+                        </div>
+                     </div>
+                   </div>
+                 )}
+
+                 {dbTable === "medicamentos" && (
+                   <div className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                        <div className="sm:col-span-2 flex items-center gap-2 mb-2">
+                           <div className="p-1.5 bg-blue-600 text-white rounded-lg"><User size={12} /></div>
+                           <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-900">Dosagem Adulto</h4>
+                        </div>
+                        <div className="space-y-1.5">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade</label>
+                           <input type="text" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" value={newRowData.quantityAdult} onChange={e => setNewRowData({...newRowData, quantityAdult: e.target.value})} placeholder="Ex: 1 caixa" />
+                        </div>
+                        <div className="space-y-1.5">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Posologia</label>
+                           <input type="text" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" value={newRowData.posologyAdult} onChange={e => setNewRowData({...newRowData, posologyAdult: e.target.value})} placeholder="Ex: 1 comp de 12/12h" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6 bg-rose-50/50 rounded-3xl border border-rose-100">
+                        <div className="sm:col-span-2 flex items-center gap-2 mb-2">
+                           <div className="p-1.5 bg-rose-600 text-white rounded-lg"><Bell size={12} /></div>
+                           <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-900">Dosagem Criança</h4>
+                        </div>
+                        <div className="space-y-1.5">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade</label>
+                           <input type="text" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" value={newRowData.quantityChild} onChange={e => setNewRowData({...newRowData, quantityChild: e.target.value})} placeholder="Ex: 1 frasco" />
+                        </div>
+                        <div className="space-y-1.5">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Posologia</label>
+                           <input type="text" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" value={newRowData.posologyChild} onChange={e => setNewRowData({...newRowData, posologyChild: e.target.value})} placeholder="Ex: 5ml de 8/8h" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Via de Administração / Uso</label>
+                         <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold" value={newRowData.usage} onChange={e => setNewRowData({...newRowData, usage: e.target.value})} placeholder="Ex: Uso Oral, Uso Tópico" />
+                      </div>
                    </div>
                  )}
               </div>
               <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-                 <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase text-slate-500 bg-white border border-slate-200 rounded-2xl">Cancelar</button>
-                 <button onClick={handleAddRow} disabled={saving || !newRowData.name} className="flex-1 py-4 text-[10px] font-black uppercase text-white bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 disabled:opacity-50">
-                    {saving ? "Salvando..." : "Confirmar"}
+                 <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase text-slate-500 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors">Cancelar</button>
+                 <button onClick={handleSaveRow} disabled={saving || !newRowData.name} className="flex-1 py-4 text-[10px] font-black uppercase text-white bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 disabled:opacity-50 active:scale-95 transition-all">
+                    {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : (editingId ? "Atualizar Registro" : "Cadastrar Agora")}
                  </button>
               </div>
            </div>

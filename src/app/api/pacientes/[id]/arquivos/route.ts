@@ -16,7 +16,29 @@ export async function GET(
       [id]
     );
 
-    return NextResponse.json(arquivos);
+    // Buscar documentos gerados pelo sistema (atestados, receitas, etc)
+    const documentos = await db.all(
+      `SELECT ID_DOCUMENTO as id, NOME as nome, TIPO as tipo, TIME_STAMP_INS as data, TEXTO as texto 
+       FROM LOG_DOCUMENTO 
+       WHERE NROPAC = ? 
+       ORDER BY TIME_STAMP_INS DESC`,
+      [id]
+    );
+
+    // Mapear documentos para o formato de arquivos
+    const documentosFormatados = documentos.map(doc => ({
+      ID: `DOC_${doc.id}`,
+      NROPAC: id,
+      NOME: doc.nome || (doc.tipo === '1' ? 'Atestado' : 'Receituário'),
+      TIPO: doc.tipo === '1' ? 'atestado' : (doc.tipo === '2' ? 'receituario' : 'documento'),
+      PATH: `db://LOG_DOCUMENTO/${doc.id}`,
+      DATA_UPLOAD: doc.data,
+      OBSERVACAO: "Gerado pelo sistema",
+      IS_VIRTUAL: true,
+      CONTENT: doc.texto
+    }));
+
+    return NextResponse.json([...arquivos, ...documentosFormatados]);
   } catch (error: any) {
     console.error("API Error (Files GET):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
