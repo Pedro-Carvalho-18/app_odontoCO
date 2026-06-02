@@ -144,7 +144,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
     }
   };
 
-  const handleDeleteFile = async (fileId: number) => {
+  const handleDeleteFile = async (fileId: number | string) => {
     if (!confirm("Deseja realmente excluir este arquivo?")) return;
 
     try {
@@ -216,7 +216,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
   });
 
   const getBreadcrumbs = () => {
-    const crumbs = [{ name: 'Raiz', path: [] }];
+    const crumbs: { name: string; path: string[] }[] = [{ name: 'Raiz', path: [] }];
     if (currentPath[0]) {
       const catNames: any = { atestados: 'Atestados', receituarios: 'Receituários', radiografias: 'Radiografias', tratamentos: 'Tratamentos' };
       crumbs.push({ name: catNames[currentPath[0]], path: [currentPath[0]] });

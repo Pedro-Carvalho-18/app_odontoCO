@@ -11,7 +11,8 @@ import {
   Calendar, 
   Clock, 
   History,
-  FileText, 
+  FileText,
+  FileBadge,
   ShieldCheck,
   CreditCard,
   Plus,
@@ -444,12 +445,18 @@ function PatientProfileContent() {
                 <>
                   <div>
                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                      {selectedItem.procedure.includes("Receitado:") ? "Receituário" : "Procedimento"}
+                      {selectedItem.procedure.includes("Receitado:") ? "Receituário" : 
+                       selectedItem.procedure.includes("Atestado:") ? "Atestado" :
+                       selectedItem.procedure.includes("DIAGNÓSTICO:") ? "Diagnóstico" : "Procedimento"}
                     </p>
                     <h4 className="text-xl font-bold text-slate-900 leading-tight italic">
                       {selectedItem.procedure.includes("Receitado:") 
                         ? selectedItem.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()
-                        : selectedItem.procedure || "Procedimento sem descrição"}
+                        : selectedItem.procedure.includes("Atestado:")
+                          ? selectedItem.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()
+                          : selectedItem.procedure.includes("DIAGNÓSTICO:")
+                            ? selectedItem.procedure.replace(/DIAGNÓSTICO:\s*/i, "").trim()
+                            : selectedItem.procedure || "Procedimento sem descrição"}
                     </h4>
                   </div>
 
@@ -475,7 +482,7 @@ function PatientProfileContent() {
                     </div>
                   </div>
 
-                  {selectedItem.type === 'intervention' && (
+                  {selectedItem.type === 'intervention' && !selectedItem.procedure.includes("Receitado:") && !selectedItem.procedure.includes("Atestado:") && !selectedItem.procedure.includes("DIAGNÓSTICO:") && (
                     <div className="grid grid-cols-1 gap-4">
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Situação Financeira</p>
@@ -488,26 +495,28 @@ function PatientProfileContent() {
                     </div>
                   )}
 
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CreditCard size={14} className="text-slate-400" />
-                        <span className="text-[10px] font-black text-slate-500 uppercase">Pagamento</span>
+                  {!selectedItem.procedure.includes("Receitado:") && !selectedItem.procedure.includes("Atestado:") && !selectedItem.procedure.includes("DIAGNÓSTICO:") && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CreditCard size={14} className="text-slate-400" />
+                          <span className="text-[10px] font-black text-slate-500 uppercase">Pagamento</span>
+                        </div>
+                        <p className="text-sm font-black text-slate-900">R$ {selectedItem.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </div>
-                      <p className="text-sm font-black text-slate-900">R$ {selectedItem.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      
+                      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/50">
+                        <div>
+                          <p className="text-[8px] font-black text-slate-400 uppercase">Forma</p>
+                          <p className="text-[10px] font-bold text-slate-700">{selectedItem.paymentMethod || "Não informado"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[8px] font-black text-slate-400 uppercase">Parcelas</p>
+                          <p className="text-[10px] font-bold text-slate-700">{selectedItem.totalInstallments ? `${selectedItem.totalInstallments}x` : (selectedItem.installments ? `${selectedItem.installments}x` : "À vista / N/A")}</p>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/50">
-                      <div>
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Forma</p>
-                        <p className="text-[10px] font-bold text-slate-700">{selectedItem.paymentMethod || "Não informado"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Parcelas</p>
-                        <p className="text-[10px] font-bold text-slate-700">{selectedItem.totalInstallments ? `${selectedItem.totalInstallments}x` : (selectedItem.installments ? `${selectedItem.installments}x` : "À vista / N/A")}</p>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   {selectedItem.prescriptions && (
                     <div className="space-y-2">
@@ -569,10 +578,12 @@ function PatientProfileContent() {
                   )}
 
                   <div className="flex items-center gap-4 text-[10px] text-slate-400 font-bold uppercase">
-                    <div className="flex items-center gap-1">
-                      <ShieldCheck size={12} />
-                      Dente: {selectedItem.tooth || "Geral"}
-                    </div>
+                    {!selectedItem.procedure.includes("Receitado:") && !selectedItem.procedure.includes("Atestado:") && (
+                      <div className="flex items-center gap-1">
+                        <ShieldCheck size={12} />
+                        Dente: {selectedItem.tooth || "Geral"}
+                      </div>
+                    )}
                     {selectedItem.convenio && (
                       <div className="flex items-center gap-1">
                         <ShieldCheck size={12} />
@@ -826,9 +837,34 @@ function PatientProfileContent() {
                                 {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()}
                               </p>
                             </div>
+                          ) : item.procedure.includes("Atestado:") ? (
+                            <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50 group-hover:border-emerald-200 transition-all">
+                              <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                                <FileBadge size={18} className="shrink-0" />
+                                <span className="text-[11px] font-black uppercase tracking-widest">Atestado Gerado</span>
+                              </div>
+                              <p className="text-[15px] font-bold text-slate-700 leading-relaxed italic">
+                                {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}
+                              </p>
+                            </div>
+                          ) : item.procedure.includes("DIAGNÓSTICO:") ? (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-amber-500 mb-1">
+                                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                                  <span className="text-[11px] font-black uppercase tracking-wider">Diagnóstico Clínico</span>
+                                </div>
+                                <h4 className="text-[16px] font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase">
+                                  {item.procedure.replace(/DIAGNÓSTICO:\s*/i, "").trim()}
+                                  {item.tooth && (
+                                    <span className="ml-2 text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
+                                      Dente {item.tooth}
+                                    </span>
+                                  )}
+                                </h4>
+                            </div>
                           ) : (
-                            <h4 className="text-[16px] font-black text-slate-900 group-hover:text-blue-600 transition-colors">
-                              {item.procedure}
+                            <h4 className="text-[16px] font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase">
+                              {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}
                               {item.tooth && (
                                 <span className="ml-2 text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
                                   Dente {item.tooth}
@@ -836,14 +872,16 @@ function PatientProfileContent() {
                               )}
                             </h4>
                           )}
-                          <div className="flex items-center gap-4 mt-1.5">
-                            <p className="text-[11px] font-bold text-slate-500">Valor: R$ {item.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            {item.paymentMethod && (
-                              <p className="text-[11px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded">
-                                {item.paymentMethod}
-                              </p>
-                            )}
-                          </div>
+                          {!item.procedure.includes("Receitado:") && !item.procedure.includes("Atestado:") && !item.procedure.includes("DIAGNÓSTICO:") && (
+                            <div className="flex items-center gap-4 mt-1.5">
+                              <p className="text-[11px] font-bold text-slate-500">Valor: R$ {item.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              {item.paymentMethod && (
+                                <p className="text-[11px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded">
+                                  {item.paymentMethod}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))

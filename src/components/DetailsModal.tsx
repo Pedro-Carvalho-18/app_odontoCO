@@ -1,5 +1,19 @@
 export const DetailsModal = ({ item, isOpen, onClose }: { item: any; isOpen: boolean; onClose: () => void }) => {
   if (!isOpen) return null;
+  
+  const isRecipe = item.procedure.includes("Receitado:");
+  const isDiag = item.procedure.includes("DIAGNÓSTICO:");
+  const isAtestado = item.procedure.includes("Atestado:");
+  
+  const labelText = isRecipe ? "Receituário" : isDiag ? "Diagnóstico" : isAtestado ? "Atestado" : "Procedimento";
+  const contentText = isRecipe 
+    ? item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()
+    : isDiag
+      ? item.procedure.replace(/DIAGNÓSTICO:\s*/i, "").trim()
+      : isAtestado
+        ? item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()
+        : item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim();
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[250] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-xl rounded-[32px] p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
@@ -10,12 +24,10 @@ export const DetailsModal = ({ item, isOpen, onClose }: { item: any; isOpen: boo
         <div className="space-y-6">
           <div>
             <label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">
-              {item.procedure.includes("Receitado:") ? "Receituário" : "Procedimento"}
+              {labelText}
             </label>
             <p className="text-lg font-black text-slate-900 leading-tight italic">
-              {item.procedure.includes("Receitado:") 
-                ? item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()
-                : item.procedure}
+              {contentText}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-8">
@@ -29,9 +41,14 @@ export const DetailsModal = ({ item, isOpen, onClose }: { item: any; isOpen: boo
           </div>
           <div className="grid grid-cols-2 gap-8">
             <div><label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">Profissional</label><p className="text-sm font-bold text-slate-800">{item.professional}</p></div>
-            <div><label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">Valor</label><p className="text-base font-black text-emerald-600">
-  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.numericValue || item.value)}
-</p></div>
+            {!isRecipe && !isAtestado && !isDiag && (
+              <div><label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">Valor</label><p className="text-base font-black text-emerald-600">
+    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.numericValue || item.value)}
+  </p></div>
+            )}
+            {!isRecipe && !isAtestado && item.tooth && item.tooth !== 'N/A' && (
+              <div><label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">Dente / Região</label><p className="text-sm font-bold text-slate-800 uppercase">Dente {item.tooth}</p></div>
+            )}
           </div>
           <div><label className="font-black text-slate-400 uppercase text-[11px] tracking-widest block mb-1">Observações</label><p className="text-sm font-bold text-slate-600 bg-slate-50 p-4 rounded-2xl mt-1 leading-relaxed border border-slate-100 italic">"{item.notes}"</p></div>
         </div>

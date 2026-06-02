@@ -46,12 +46,14 @@ import {
   Microscope,
   Stethoscope,
   Scan,
-  Layout
+  Layout,
+  Menu
 } from "lucide-react";
 import { cn, normalizeString } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FilesModal } from "@/components/FilesModal";
 import { DetailsModal } from "@/components/DetailsModal";
+import { ReceiptModal } from "@/components/ReceiptModal";
 
 interface Patient {
   id: string;
@@ -76,6 +78,8 @@ type ToothStatus = 'healthy' | 'caries' | 'restoration' | 'absent' | 'prosthesis
 
 interface ToothState {
   status: ToothStatus;
+  latestIcon?: string;
+  procedureName?: string;
   surfaces: {
     top: boolean;
     bottom: boolean;
@@ -91,6 +95,8 @@ const initialOdontogram = () => {
    48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].forEach(n => {
     arc[n] = {
       status: 'healthy',
+      latestIcon: undefined,
+      procedureName: undefined,
       surfaces: { top: false, bottom: false, left: false, right: false, center: false }
     };
   });
@@ -116,6 +122,7 @@ export default function PatientRecordPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showOdontoInfo, setShowOdontoInfo] = useState(false);
   const isFetchingRef = useRef(false);
 
   useEffect(() => {
@@ -169,6 +176,7 @@ export default function PatientRecordPage() {
     payments: any[];
     professionals: any[];
     convenios: any[];
+    motivosAtestado: any[];
   } | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
 
@@ -176,6 +184,7 @@ export default function PatientRecordPage() {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedTreatment, setSelectedTreatment] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
+  const [selectedTreatmentIcon, setSelectedTreatmentIcon] = useState<string | null>(null);
   const [selectedProcedures, setSelectedProcedures] = useState<any[]>([]);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("1");
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>("none");
@@ -207,6 +216,7 @@ export default function PatientRecordPage() {
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [showAtestadoModal, setShowAtestadoModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [initialFilesIntervention, setInitialFilesIntervention] = useState<string | undefined>(undefined);
   const [prescriptionText, setPrescriptionText] = useState("");
   
@@ -277,9 +287,197 @@ export default function PatientRecordPage() {
     loadCatalog();
   }, []);
 
-  const [patientOdontograms, setPatientOdontograms] = useState<Record<string, Record<number, { status: ToothStatus; surfaces: any }>>>({});
+  const [patientOdontograms, setPatientOdontograms] = useState<Record<string, Record<number, ToothState>>>({});
   const [modifiedTeeth, setModifiedTeeth] = useState<Record<string, number[]>>({});
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+
+  const diagCategories = [
+    {
+      id: 'ausencia',
+      name: 'Ausência',
+      icon: 'dia_auscoroa.bmp',
+      items: [
+        { name: 'Faltante', icon: 'dia_auscoroa.bmp' },
+        { name: 'Cárie', icon: 'int_carie.bmp' },
+        { name: 'Aus. Coroa', icon: 'dia_auscoroa.bmp' },
+        { name: 'Aus. Raiz', icon: 'dia_ausraiz.bmp' },
+        { name: 'Impactado', icon: 'dia_impactado.bmp' },
+        { name: 'Incluso', icon: 'dia_incluso.bmp' },
+        { name: 'Semi', icon: 'dia_semi.bmp' },
+        { name: 'Supranum.', icon: 'dia_supranum.bmp' },
+      ]
+    },
+    {
+      id: 'posicao',
+      name: 'Posição',
+      icon: 'dia_extrusao.bmp',
+      items: [
+        { name: 'Extrusão', icon: 'dia_extrusao.bmp' },
+        { name: 'Intrusão', icon: 'dia_intrusao.bmp' },
+        { name: 'Giroversão', icon: 'dia_giroversao.bmp' },
+      ]
+    },
+    {
+      id: 'lesao',
+      name: 'Lesão',
+      icon: 'dia_lesao.bmp',
+      items: [
+        { name: 'Lesão', icon: 'dia_lesao.bmp' },
+        { name: 'Fratura', icon: 'dia_fratura.bmp' },
+        { name: 'Fissura', icon: 'dia_fissura.bmp' },
+        { name: 'Trepanacao', icon: 'dia_trepanacao.bmp' },
+        { name: 'Erosão', icon: 'dia_erosao.bmp' },
+        { name: 'Descalcif.', icon: 'dia_descalcif.bmp' },
+      ]
+    },
+    {
+      id: 'anomalias',
+      name: 'Geral',
+      icon: 'dia_distal.bmp',
+      items: [
+        { name: 'Mesial', icon: 'dia_mesial.bmp' },
+        { name: 'Distal', icon: 'dia_distal.bmp' },
+        { name: 'Fluorose', icon: 'dia_fluorose.bmp' },
+      ]
+    }
+  ];
+
+  const [activeDiagCategoryId, setActiveDiagCategoryId] = useState<string | null>(null);
+  const [subDiagStartIndex, setSubDiagStartIndex] = useState(0);
+
+  const intCategories = [
+    { 
+      id: 'restaura', 
+      name: 'Restauração', 
+      icon: 'int_restaura.bmp',
+      specialtyId: '1',
+      items: [
+        { name: 'Restaura', icon: 'int_restaura.bmp' },
+        { name: 'Rest. O', icon: 'int_RestO.bmp' },
+        { name: 'Rest. MO', icon: 'int_RestMO.bmp' },
+        { name: 'Rest. DO', icon: 'int_RestDO.bmp' },
+        { name: 'Rest. MOD', icon: 'int_RestMOD.bmp' },
+        { name: 'Adesiva', icon: 'int_adesiva.bmp' },
+      ]
+    },
+    { 
+      id: 'cirur', 
+      name: 'Cirurgia', 
+      icon: 'int_cirur.bmp',
+      specialtyId: '6',
+      items: [
+        { name: 'Cirurgia', icon: 'int_cirur.bmp' },
+        { name: 'Apicecto.', icon: 'int_apicecto.bmp' },
+        { name: 'Frenecto.', icon: 'int_frenec.bmp' },
+        { name: 'Gengivec.', icon: 'int_gengivec.bmp' },
+        { name: 'Hemissec.', icon: 'int_hemi.bmp' },
+        { name: 'Rizecto.', icon: 'int_rizec.bmp' },
+      ]
+    },
+    { 
+      id: 'ortho', 
+      name: 'Orto', 
+      icon: 'int_bracket.bmp',
+      specialtyId: '7',
+      items: [
+        { name: 'Bracket', icon: 'int_bracket.bmp' },
+        { name: 'Banda', icon: 'int_banda.bmp' },
+        { name: 'Attach', icon: 'int_attach.bmp' },
+        { name: 'Manut.', icon: 'int_manut.bmp' },
+        { name: 'Manut. G', icon: 'int_manuten.bmp' },
+        { name: 'Móvel', icon: 'int_movel.bmp' },
+      ]
+    },
+    { 
+      id: 'endo', 
+      name: 'Endo', 
+      icon: 'int_canal.bmp',
+      specialtyId: '3',
+      items: [
+        { name: 'Canal', icon: 'int_canal.bmp' },
+        { name: 'Pulpo', icon: 'int_pulpo.bmp' },
+        { name: 'Capeam.', icon: 'int_capea.bmp' },
+        { name: 'Trepanação', icon: 'dia_trepanacao.bmp' },
+      ]
+    },
+    { 
+      id: 'protese', 
+      name: 'Prótese', 
+      icon: 'int_coroa.bmp',
+      specialtyId: '2',
+      items: [
+        { name: 'Coroa', icon: 'int_coroa.bmp' },
+        { name: 'Prótese', icon: 'int_protese.bmp' },
+        { name: 'Prótese F', icon: 'int_fixa.bmp' },
+        { name: 'Núcleo', icon: 'int_nucleo.bmp' },
+        { name: 'Reemb.', icon: 'int_reemb.bmp' },
+        { name: 'Prótese T', icon: 'int_total.bmp' },
+      ]
+    },
+    { 
+      id: 'implant', 
+      name: 'Implante', 
+      icon: 'esp_Implantodontia.bmp',
+      specialtyId: '13',
+      items: [
+        { name: 'Implante', icon: 'int_implante.bmp' },
+        { name: 'Enxerto', icon: 'int_enxerto.bmp' },
+        { name: 'Aumento', icon: 'int_aumen.bmp' },
+      ]
+    },
+    { 
+      id: 'estetica', 
+      name: 'Estética', 
+      icon: 'esp_Estética.bmp',
+      specialtyId: '12',
+      items: [
+        { name: 'Claream.', icon: 'int_bran.bmp' },
+        { name: 'Faceta', icon: 'int_faceta.bmp' },
+        { name: 'Polim.', icon: 'int_poli.bmp' },
+      ]
+    },
+    { 
+      id: 'kids', 
+      name: 'Odontopediatria', 
+      icon: 'esp_Odontopediatria.bmp',
+      specialtyId: '9',
+      items: [
+        { name: 'Escovação', icon: 'int_escova.bmp' },
+        { name: 'Selante', icon: 'int_selante.bmp' },
+        { name: 'Flúor', icon: 'int_fluor.bmp' },
+      ]
+    },
+    { 
+      id: 'prevent', 
+      name: 'Prevenção', 
+      icon: 'int_prof.bmp',
+      specialtyId: '8',
+      items: [
+        { name: 'Prof.', icon: 'int_prof.bmp' },
+        { name: 'Raspag.', icon: 'int_raspagem.bmp' },
+        { name: 'Rasp. G', icon: 'int_raspger.bmp' },
+        { name: 'Selante', icon: 'int_selante.bmp' },
+        { name: 'Fotos', icon: 'int_fotos.bmp' },
+      ]
+    },
+    { 
+      id: 'geral', 
+      name: 'Geral', 
+      icon: 'int_consulta.bmp',
+      specialtyId: '5',
+      items: [
+        { name: 'Consulta', icon: 'int_consulta.bmp' },
+        { name: 'Emerg.', icon: 'int_emerg.bmp' },
+        { name: 'Placa', icon: 'int_placa.bmp' },
+        { name: 'Peric.', icon: 'int_peric.bmp' },
+        { name: 'Túnel', icon: 'int_tunel.bmp' },
+      ]
+    }
+  ];
+
+  const [activeIntCategoryId, setActiveIntCategoryId] = useState<string | null>(null);
+  const [subIntStartIndex, setSubIntStartIndex] = useState(0);
+
   const [iconStartIndex, setIconStartIndex] = useState(0);
   const [diagStartIndex, setDiagStartIndex] = useState(0);
   const [intStartIndex, setIntStartIndex] = useState(0);
@@ -345,9 +543,9 @@ export default function PatientRecordPage() {
           
           if (status.includes('extracao') || status.includes('ausente')) {
             newOdontogram[toothNum].status = 'absent';
-          } else if (status.includes('canal') || status.includes('bloco') || status.includes('coroa') || status.includes('fixa')) {
+          } else if (status.includes('canal')) {
             newOdontogram[toothNum].status = 'restoration';
-          } else if (status.includes('implante') || status.includes('total') || status.includes('pontica')) {
+          } else if (status.includes('implante') || status.includes('total') || status.includes('pontica') || status.includes('coroa') || status.includes('fixa') || status.includes('bloco')) {
             newOdontogram[toothNum].status = 'prosthesis';
           } else if (status.includes('carie')) {
             newOdontogram[toothNum].status = 'caries';
@@ -361,6 +559,10 @@ export default function PatientRecordPage() {
             newOdontogram[toothNum].surfaces.bottom = String(item.FACE3) === '-1';
             newOdontogram[toothNum].surfaces.left = String(item.FACE4) === '-1';
             newOdontogram[toothNum].surfaces.center = String(item.FACE5) === '-1';
+          }
+          if (item.latestIcon) {
+            newOdontogram[toothNum].latestIcon = item.latestIcon;
+            newOdontogram[toothNum].procedureName = item.procedureName;
           }
         });
       }
@@ -434,17 +636,6 @@ export default function PatientRecordPage() {
       fetchPatients(nextPage, searchTerm, true);
     }
   };
-
-  useEffect(() => {
-    async function loadCatalog() {
-      try {
-        const res = await fetch('/api/catalogo', { cache: 'no-store' });
-        const data = await res.json();
-        setCatalogData(data);
-      } catch (err) { console.error(err); } finally { setLoadingCatalog(false); }
-    }
-    loadCatalog();
-  }, []);
 
   useEffect(() => {
     if (selectedPatient) fetchHistory(selectedPatient.id);
@@ -540,6 +731,27 @@ export default function PatientRecordPage() {
     };
   }, [patientOdontograms, history, selectedPatient, initialLoadDone]);
 
+  const findProcedureInCatalog = useCallback((name: string) => {
+    if (!catalogData?.procedures) return null;
+    const normalizedSearch = normalizeString(name);
+    
+    // 1. Tenta correspondência exata primeiro (prioridade máxima)
+    const exactMatch = catalogData.procedures.find(p => normalizeString(p.name) === normalizedSearch);
+    if (exactMatch) return exactMatch;
+
+    // 2. Tenta encontrar os que COMEÇAM com o termo (ex: "Coroa" deve bater com "Coroa/Metal" antes de "Aumento de Coroa")
+    const startingMatches = catalogData.procedures
+      .filter(p => normalizeString(p.name).startsWith(normalizedSearch))
+      .sort((a, b) => a.name.length - b.name.length); // Prefere o nome mais curto
+    if (startingMatches.length > 0) return startingMatches[0];
+
+    // 3. Tenta encontrar uma correspondência parcial em qualquer lugar
+    const partialMatches = catalogData.procedures
+      .filter(p => normalizeString(p.name).includes(normalizedSearch))
+      .sort((a, b) => a.name.length - b.name.length);
+    return partialMatches.length > 0 ? partialMatches[0] : null;
+  }, [catalogData]);
+
   const updateTooth = (number: number, status: ToothStatus, surfaces: any) => {
     if (!selectedPatient) return;
     const pId = String(selectedPatient.id);
@@ -571,51 +783,70 @@ export default function PatientRecordPage() {
     return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  const handleLaunchTreatment = async () => {
-    if ((selectedProcedures.length === 0 && !selectedTreatment) || !selectedPatient) return;
-    
+  const executeLaunch = async (
+    pId: string, 
+    procedureName: string, 
+    toothNum: string, 
+    procedureId: string = '0', 
+    price: number = 0, 
+    icon?: string | null,
+    isDiagnostic: boolean = false
+  ) => {
     setLoadingHistory(true);
-    
+    const timestamp = Date.now();
     const prof = catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Clínica";
     const pay = catalogData?.payments?.find(p => p.id === selectedPaymentId)?.name || "PIX";
     const conv = catalogData?.convenios?.find(p => p.id === selectedConvenioId)?.name || "Particular";
     
-    const baseValStr = treatmentValue.replace(/\D/g, '');
-    const baseVal = (parseInt(baseValStr) || 0) / 100;
+    let currentOdontogram = { ...(patientOdontograms[pId] || initialOdontogram()) };
+    const tNumInt = parseInt(toothNum);
     
-    const discStr = discountValue.replace(/\D/g, '');
-    const disc = (parseInt(discStr) || 0) / 100;
-    
-    const finalTotal = Math.max(0, baseVal - disc);
-    
-    const toothNum = manualTooth || selectedTooth?.toString() || "Geral";
-    const timestamp = Date.now();
+    if (!isNaN(tNumInt) && currentOdontogram[tNumInt]) {
+      const procLower = procedureName.toLowerCase();
+      if (procLower.includes('extra') || procLower.includes('ausen') || procLower.includes('faltante')) {
+        currentOdontogram[tNumInt].status = 'absent';
+        currentOdontogram[tNumInt].latestIcon = 'dia_auscoroa.bmp';
+      } else if (procLower.includes('canal')) {
+        currentOdontogram[tNumInt].status = 'restoration';
+      } else if (procLower.includes('implante') || procLower.includes('total') || procLower.includes('pontica') || (procLower.includes('coroa') && !procLower.includes('aumento')) || procLower.includes('fixa') || procLower.includes('bloco') || procLower.includes('protese')) {
+        currentOdontogram[tNumInt].status = 'prosthesis';
+      } else if (procLower.includes('carie')) {
+        currentOdontogram[tNumInt].status = 'caries';
+        currentOdontogram[tNumInt].latestIcon = 'int_carie.bmp';
+      }
 
-    const proceduresToLaunch = selectedProcedures.length > 0 ? selectedProcedures : [{ name: selectedTreatment, price: baseVal, id: selectedTreatmentId }];
-    const combinedName = proceduresToLaunch.map(p => p.name).join(" + ");
+      if (icon) {
+        currentOdontogram[tNumInt].latestIcon = icon;
+        currentOdontogram[tNumInt].procedureName = procedureName;
+        const iconLower = icon.toLowerCase();
+        if (iconLower.includes('carie')) currentOdontogram[tNumInt].status = 'caries';
+        else if (iconLower.includes('aus') || iconLower.includes('incluso') || iconLower.includes('faltante')) currentOdontogram[tNumInt].status = 'absent';
+        else if (iconLower.includes('lesao') || iconLower.includes('fratura') || iconLower.includes('fissura')) currentOdontogram[tNumInt].status = 'caries';
+      }
+    }
 
-    const pId = String(selectedPatient.id);
-    const currentOdontogram = patientOdontograms[pId] || initialOdontogram();
-    
+    const typeLabel = isDiagnostic ? "DIAGNÓSTICO" : "PROCEDIMENTO";
+
     const newItem = { 
       id: timestamp, 
       type: 'intervention', 
       date: procedureDate, 
       tooth: toothNum, 
-      procedure: combinedName, 
+      procedure: procedureName, 
       status: procedureStatus, 
       professional: prof, 
       professionalId: selectedProfessionalId,
       paymentMethodId: selectedPaymentId,
       paymentMethod: pay,
       isPaid: isPaid,
-      value: finalTotal, 
-      numericValue: finalTotal, 
-      notes: `${procedureTime} | Convênio: ${conv} | Pagamento: ${pay} (${installments}x) | ${observation}`,
+      value: price, 
+      numericValue: price, 
+      procedureId: procedureId,
+      notes: `${typeLabel}: ${procedureName} | ${procedureTime} | Convênio: ${conv} | Pagamento: ${pay} (${installments}x) | ${observation}`,
       installments: installments,
-      toothData: toothNum !== "Geral" && !isNaN(parseInt(toothNum)) ? currentOdontogram[parseInt(toothNum)] : undefined
+      toothData: tNumInt && !isNaN(tNumInt) ? currentOdontogram[tNumInt] : undefined
     };
-    
+
     try {
       const res = await fetch(`/api/pacientes/${pId}/salvar`, { 
         method: 'POST', 
@@ -624,7 +855,6 @@ export default function PatientRecordPage() {
       });
       
       if (res.ok) {
-        // Importante: Limpar o dente se ele estava pendente de salvar manual
         const tInt = parseInt(toothNum);
         if (!isNaN(tInt)) {
           setModifiedTeeth(prev => ({
@@ -632,29 +862,57 @@ export default function PatientRecordPage() {
             [pId]: (prev[pId] || []).filter(n => n !== tInt)
           }));
         }
-        
+        setHistory(prev => prev.filter(h => typeof h.id !== 'number'));
+        setPatientOdontograms(prev => ({ ...prev, [pId]: currentOdontogram }));
         await fetchHistory(pId);
-        alert(`Procedimento "${combinedName}" lançado com sucesso!`);
-        
-        // Reset state
-        setSelectedProcedures([]);
-        setSelectedTreatment(null);
-        setSelectedTreatmentId(null);
-        setTreatmentValue("");
-        setDiscountValue("");
-        setObservation("");
-        setSelectedPaymentId("1");
-        setInstallments("1");
-        setShowLaunchModal(false);
-      } else {
-        const errData = await res.json();
-        alert(`Erro ao salvar no servidor: ${errData.error || 'Erro desconhecido'}`);
+        return true;
       }
-    } catch (err) { 
-      console.error(err); 
-      alert("Erro crítico: Falha ao conectar com a API de salvamento.");
-    } finally { 
-      setLoadingHistory(false); 
+      return false;
+    } catch (err) {
+      console.error(err);
+      return false;
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleLaunchTreatment = async () => {
+    if ((selectedProcedures.length === 0 && !selectedTreatment) || !selectedPatient) return;
+    
+    const baseValStr = treatmentValue.replace(/\D/g, '');
+    const baseVal = (parseInt(baseValStr) || 0) / 100;
+    const discStr = discountValue.replace(/\D/g, '');
+    const disc = (parseInt(discStr) || 0) / 100;
+    const finalTotal = Math.max(0, baseVal - disc);
+    
+    const toothNum = manualTooth || selectedTooth?.toString() || "Geral";
+    const proceduresToLaunch = selectedProcedures.length > 0 ? selectedProcedures : [{ name: selectedTreatment, price: baseVal, id: selectedTreatmentId }];
+    const combinedName = proceduresToLaunch.map(p => p.name).join(" + ");
+    const procId = proceduresToLaunch[0]?.id || selectedTreatmentId || '0';
+
+    const success = await executeLaunch(
+      String(selectedPatient.id),
+      combinedName,
+      toothNum,
+      procId,
+      finalTotal,
+      selectedTreatmentIcon
+    );
+
+    if (success) {
+      alert(`Procedimento "${combinedName}" lançado com sucesso!`);
+      setSelectedProcedures([]);
+      setSelectedTreatment(null);
+      setSelectedTreatmentId(null);
+      setSelectedTreatmentIcon(null);
+      setTreatmentValue("");
+      setDiscountValue("");
+      setObservation("");
+      setSelectedPaymentId("1");
+      setInstallments("1");
+      setShowLaunchModal(false);
+    } else {
+      alert("Erro ao salvar no servidor.");
     }
   };
 
@@ -726,329 +984,425 @@ export default function PatientRecordPage() {
         <div className="flex items-center gap-2">
           {selectedPatient && (
             <>
-              {/* Carrossel de Ícones de Diagnóstico */}
-              <div className={cn(
-                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-2 transition-all duration-500 overflow-hidden",
-                isDiagExpanded ? "max-w-[500px]" : "max-w-[48px]"
-              )}>
-                <button 
-                  onClick={() => {
-                    const next = !isDiagExpanded;
-                    setIsDiagExpanded(next);
-                    if (next) { setIsIntExpanded(false); setIsTreatmentsExpanded(false); }
-                  }}
-                  className={cn(
-                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
-                    isDiagExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
-                  )}
-                  title={isDiagExpanded ? "Fechar" : "Abrir Diagnóstico"}
-                >
-                  {isDiagExpanded ? <X size={20} /> : <Activity size={20} />}
-                </button>
+              {/* Carrossel de Ícones de Diagnóstico (Categorizado) */}
+              <div className="relative group">
+                <div className={cn(
+                  "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-2 transition-all duration-500 overflow-hidden",
+                  isDiagExpanded ? "max-w-[500px]" : "max-w-[48px]"
+                )}>
+                  <button 
+                    onClick={() => {
+                      const next = !isDiagExpanded;
+                      setIsDiagExpanded(next);
+                      if (!next) {
+                        setActiveDiagCategoryId(null);
+                      }
+                      if (next) { setIsIntExpanded(false); setIsTreatmentsExpanded(false); }
+                    }}
+                    className={cn(
+                      "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                      isDiagExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
+                    )}
+                    title={isDiagExpanded ? "Fechar" : "Abrir Diagnóstico"}
+                  >
+                    {isDiagExpanded ? <X size={20} /> : <Microscope size={20} />}
+                  </button>
 
-                {isDiagExpanded && (
-                  <>
+                  {isDiagExpanded && (
+                    <div className="flex items-center gap-2.5 shrink-0 px-1">
+                       {diagCategories.map((cat) => (
+                          <button 
+                            key={cat.id}
+                            title={cat.name}
+                            onClick={() => {
+                               if (activeDiagCategoryId === cat.id) {
+                                  setActiveDiagCategoryId(null);
+                               } else {
+                                  setActiveDiagCategoryId(cat.id);
+                                  setSubDiagStartIndex(0);
+                               }
+                            }}
+                            className={cn(
+                              "group relative flex flex-col items-center p-2 rounded-xl transition-all duration-200 border-2",
+                              activeDiagCategoryId === cat.id 
+                                ? "bg-white border-blue-500 shadow-md scale-105" 
+                                : "border-transparent hover:bg-white hover:border-slate-200"
+                            )}
+                          >
+                             <img 
+                               src={`/icones/app/${cat.icon}`} 
+                               alt={cat.name} 
+                               className="w-7 h-7 object-contain transition-all"
+                             />
+                             <span className="absolute -bottom-1 text-[7px] font-black uppercase tracking-tighter text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                               {cat.name}
+                             </span>
+                          </button>
+                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-carrossel de Variações de Diagnóstico */}
+                {isDiagExpanded && activeDiagCategoryId && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 z-[60] flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-300">
                     <button 
-                      onClick={() => setDiagStartIndex(prev => (prev - 1 + 18) % 18)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                      onClick={() => {
+                        const items = diagCategories.find(c => c.id === activeDiagCategoryId)?.items || [];
+                        setSubDiagStartIndex(prev => (prev - 1 + items.length) % items.length);
+                      }}
+                      className="p-1 hover:bg-slate-50 rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
                     >
-                      <ChevronLeft size={16} />
+                      <ChevronLeft size={14} />
                     </button>
 
-                    <div className="flex items-center gap-0.5 shrink-0">
-                       {[
-                          { name: 'Aus. Coroa', icon: 'dia_auscoroa.bmp' },
-                          { name: 'Aus. Raiz', icon: 'dia_ausraiz.bmp' },
-                          { name: 'Descalcif.', icon: 'dia_descalcif.bmp' },
-                          { name: 'Distal', icon: 'dia_distal.bmp' },
-                          { name: 'Erosão', icon: 'dia_erosao.bmp' },
-                          { name: 'Extrusão', icon: 'dia_extrusao.bmp' },
-                          { name: 'Fissura', icon: 'dia_fissura.bmp' },
-                          { name: 'Fluorose', icon: 'dia_fluorose.bmp' },
-                          { name: 'Fratura', icon: 'dia_fratura.bmp' },
-                          { name: 'Giroversão', icon: 'dia_giroversao.bmp' },
-                          { name: 'Impactado', icon: 'dia_impactado.bmp' },
-                          { name: 'Incluso', icon: 'dia_incluso.bmp' },
-                          { name: 'Intrusão', icon: 'dia_intrusao.bmp' },
-                          { name: 'Lesão', icon: 'dia_lesao.bmp' },
-                          { name: 'Mesial', icon: 'dia_mesial.bmp' },
-                          { name: 'Semi', icon: 'dia_semi.bmp' },
-                          { name: 'Supranum.', icon: 'dia_supranum.bmp' },
-                          { name: 'Trepanacao', icon: 'dia_trepanacao.bmp' },
-                       ].map((_, i, all) => all[(diagStartIndex + i) % all.length]).slice(0, 4).map((item, idx) => (
+                    <div className="flex items-center gap-0.5 max-w-[400px] overflow-hidden">
+                      {(diagCategories.find(c => c.id === activeDiagCategoryId)?.items || [])
+                        .map((_, i, all) => all[(subDiagStartIndex + i) % all.length])
+                        .slice(0, 6)
+                        .map((item, idx) => (
                           <button 
                             key={idx}
                             title={item.name}
-                            onClick={() => {
-                               if (!selectedTooth) {
-                                  alert("Selecione um dente primeiro no odontograma.");
+                            onClick={async () => {
+                               if (!selectedPatient) {
+                                  alert("Selecione um paciente primeiro.");
                                   return;
                                }
-                               setObservation(prev => prev ? `${prev} | ${item.name}` : item.name);
-                               setShowLaunchModal(true);
+                               
+                               const toothNum = selectedTooth?.toString() || "Geral";
+                               const success = await executeLaunch(
+                                  selectedPatient.id,
+                                  item.name,
+                                  toothNum,
+                                  '0', // No procedureId for simple diagnostics
+                                  0,   // No price for diagnostics
+                                  item.icon,
+                                  true // isDiagnostic = true
+                               );
+
+                               if (success) {
+                                  // No alert needed for direct clinical marks, but we could add a toast here
+                               } else {
+                                  alert("Erro ao registrar diagnóstico.");
+                               }
                             }}
-                            className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
+                            className="group relative flex flex-col items-center p-2 hover:bg-slate-50 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-100"
                           >
                              <img 
                                src={`/icones/app/${item.icon}`} 
                                alt={item.name} 
-                               className="w-7 h-7 object-contain transition-all group-hover:scale-110"
+                               className="w-6 h-6 object-contain transition-all group-hover:scale-110"
                              />
+                             <span className="text-[7px] font-black uppercase mt-1 text-slate-500 group-hover:text-blue-600 whitespace-nowrap">
+                               {item.name}
+                             </span>
                           </button>
-                       ))}
+                        ))
+                      }
                     </div>
 
                     <button 
-                      onClick={() => setDiagStartIndex(prev => (prev + 1) % 18)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                      onClick={() => {
+                        const items = diagCategories.find(c => c.id === activeDiagCategoryId)?.items || [];
+                        setSubDiagStartIndex(prev => (prev + 1) % items.length);
+                      }}
+                      className="p-1 hover:bg-slate-50 rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
                     >
-                      <ChevronRight size={16} />
+                      <ChevronRight size={14} />
                     </button>
-                  </>
+
+                    <div className="h-6 w-px bg-slate-100 mx-1" />
+                    
+                    <button 
+                      onClick={() => setActiveDiagCategoryId(null)}
+                      className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                      title="Fechar Variações"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 )}
               </div>
 
               <div className="h-6 w-px bg-slate-200 mx-1" />
 
-              {/* Carrossel de Ícones de Intervenções (int_) */}
-              <div className={cn(
-                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
-                isIntExpanded ? "max-w-[500px]" : "max-w-[48px]"
-              )}>
-                <button 
-                  onClick={() => {
-                    const next = !isIntExpanded;
-                    setIsIntExpanded(next);
-                    if (next) { setIsDiagExpanded(false); setIsTreatmentsExpanded(false); }
-                  }}
-                  className={cn(
-                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
-                    isIntExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
-                  )}
-                  title={isIntExpanded ? "Fechar" : "Abrir Intervenções"}
-                >
-                  {isIntExpanded ? <X size={20} /> : <Zap size={20} />}
-                </button>
+              {/* Carrossel de Ícones de Intervenções (Unificado com Especialidades) */}
+              <div className="relative group">
+                <div className={cn(
+                  "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
+                  isIntExpanded ? "max-w-[800px]" : "max-w-[48px]"
+                )}>
+                  <button 
+                    onClick={() => {
+                      const next = !isIntExpanded;
+                      setIsIntExpanded(next);
+                      if (!next) {
+                        setActiveIntCategoryId(null);
+                      }
+                      if (next) { setIsDiagExpanded(false); }
+                    }}
+                    className={cn(
+                      "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                      isIntExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
+                    )}
+                    title={isIntExpanded ? "Fechar" : "Abrir Plano de Tratamento"}
+                  >
+                    {isIntExpanded ? <X size={20} /> : <Activity size={20} />}
+                  </button>
 
-                {isIntExpanded && (
-                  <>
+                  {isIntExpanded && (
+                    <div className="flex items-center gap-2.5 shrink-0 px-1">
+                       {intCategories.map((cat) => (
+                          <button 
+                            key={cat.id}
+                            title={cat.name}
+                            onClick={() => {
+                               if (activeIntCategoryId === cat.id) {
+                                  setActiveIntCategoryId(null);
+                               } else {
+                                  setActiveIntCategoryId(cat.id);
+                                  setSubIntStartIndex(0);
+                               }
+                            }}
+                            className={cn(
+                              "group relative flex flex-col items-center p-2 rounded-xl transition-all duration-200 border-2",
+                              activeIntCategoryId === cat.id 
+                                ? "bg-white border-blue-500 shadow-md scale-105" 
+                                : "border-transparent hover:bg-white hover:border-slate-200"
+                            )}
+                          >
+                             <img 
+                               src={`/icones/app/${cat.icon}`} 
+                               alt={cat.name} 
+                               className="w-7 h-7 object-contain transition-all"
+                             />
+                             <span className="absolute -bottom-1 text-[7px] font-black uppercase tracking-tighter text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                               {cat.name}
+                             </span>
+                          </button>
+                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-carrossel de Variações + Botão Ver Tudo */}
+                {isIntExpanded && activeIntCategoryId && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 z-[60] flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-300">
                     <button 
-                      onClick={() => setIntStartIndex(prev => (prev - 1 + 64) % 64)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                      onClick={() => {
+                        const items = intCategories.find(c => c.id === activeIntCategoryId)?.items || [];
+                        setSubIntStartIndex(prev => (prev - 1 + items.length) % items.length);
+                      }}
+                      className="p-1 hover:bg-slate-50 rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
                     >
-                      <ChevronLeft size={16} />
+                      <ChevronLeft size={14} />
                     </button>
 
-                    <div className="flex items-center gap-0.5 shrink-0">
-                       {[
-                          { name: 'Adesiva', icon: 'int_adesiva.bmp' },
-                          { name: 'Ajuste', icon: 'int_ajuste.bmp' },
-                          { name: 'Apicecto', icon: 'int_apicecto.bmp' },
-                          { name: 'Attach', icon: 'int_attach.bmp' },
-                          { name: 'Aumen', icon: 'int_aumen.bmp' },
-                          { name: 'Banda', icon: 'int_banda.bmp' },
-                          { name: 'Bloco', icon: 'int_bloco.bmp' },
-                          { name: 'Boticao', icon: 'int_boticao.bmp' },
-                          { name: 'Bracket', icon: 'int_bracket.bmp' },
-                          { name: 'Bran', icon: 'int_bran.bmp' },
-                          { name: 'Byte', icon: 'int_byte.bmp' },
-                          { name: 'Canal', icon: 'int_canal.bmp' },
-                          { name: 'Capea', icon: 'int_capea.bmp' },
-                          { name: 'Cirur', icon: 'int_cirur.bmp' },
-                          { name: 'Consulta', icon: 'int_consulta.bmp' },
-                          { name: 'Coroa', icon: 'int_coroa.bmp' },
-                          { name: 'Desgas', icon: 'int_desgas.bmp' },
-                          { name: 'Eho', icon: 'int_eho.bmp' },
-                          { name: 'Emerg', icon: 'int_emerg.bmp' },
-                          { name: 'Enxerto', icon: 'int_enxerto.bmp' },
-                          { name: 'Escova', icon: 'int_escova.bmp' },
-                          { name: 'Faceta', icon: 'int_faceta.bmp' },
-                          { name: 'Fixa', icon: 'int_fixa.bmp' },
-                          { name: 'Fluor', icon: 'int_fluor.bmp' },
-                          { name: 'Fotos', icon: 'int_fotos.bmp' },
-                          { name: 'Frenec', icon: 'int_frenec.bmp' },
-                          { name: 'Gengivec', icon: 'int_gengivec.bmp' },
-                          { name: 'Hemi', icon: 'int_hemi.bmp' },
-                          { name: 'Implante', icon: 'int_implante.bmp' },
-                          { name: 'Lateral', icon: 'int_lateral.bmp' },
-                          { name: 'Mantene', icon: 'int_mantene.bmp' },
-                          { name: 'Manut', icon: 'int_manut.bmp' },
-                          { name: 'Manuten', icon: 'int_manuten.bmp' },
-                          { name: 'Maopunho', icon: 'int_maopunho.bmp' },
-                          { name: 'Modelo', icon: 'int_modelo.bmp' },
-                          { name: 'Mordida', icon: 'int_mordida.bmp' },
-                          { name: 'Movel', icon: 'int_movel.bmp' },
-                          { name: 'Nucleo', icon: 'int_nucleo.bmp' },
-                          { name: 'Oclusal', icon: 'int_oclusal.bmp' },
-                          { name: 'Panoram', icon: 'int_panoram.bmp' },
-                          { name: 'Peric', icon: 'int_peric.bmp' },
-                          { name: 'Placa', icon: 'int_placa.bmp' },
-                          { name: 'Poli', icon: 'int_poli.bmp' },
-                          { name: 'Prof', icon: 'int_prof.bmp' },
-                          { name: 'Protese', icon: 'int_protese.bmp' },
-                          { name: 'Provele', icon: 'int_provele.bmp' },
-                          { name: 'Provgru', icon: 'int_provgru.bmp' },
-                          { name: 'Pulpo', icon: 'int_pulpo.bmp' },
-                          { name: 'Raiox', icon: 'int_raiox.bmp' },
-                          { name: 'Raspagem', icon: 'int_raspagem.bmp' },
-                          { name: 'Raspger', icon: 'int_raspger.bmp' },
-                          { name: 'Reemb', icon: 'int_reemb.bmp' },
-                          { name: 'Remove', icon: 'int_remove.bmp' },
-                          { name: 'Restaura', icon: 'int_restaura.bmp' },
-                          { name: 'RestDO', icon: 'int_RestDO.bmp' },
-                          { name: 'RestMO', icon: 'int_RestMO.bmp' },
-                          { name: 'RestMOD', icon: 'int_RestMOD.bmp' },
-                          { name: 'RestO', icon: 'int_RestO.bmp' },
-                          { name: 'Retalho', icon: 'int_retalho.bmp' },
-                          { name: 'Rizec', icon: 'int_rizec.bmp' },
-                          { name: 'Selante', icon: 'int_selante.bmp' },
-                          { name: 'Total', icon: 'int_total.bmp' },
-                          { name: 'Tunel', icon: 'int_tunel.bmp' },
-                          { name: 'Ulecto', icon: 'int_ulecto.bmp' },
-                       ].map((_, i, all) => all[(intStartIndex + i) % all.length]).slice(0, 4).map((item, idx) => (
+                    <div className="flex items-center gap-0.5 max-w-[480px] overflow-hidden">
+                      {(intCategories.find(c => c.id === activeIntCategoryId)?.items || [])
+                        .map((_, i, all) => all[(subIntStartIndex + i) % all.length])
+                        .slice(0, 6)
+                        .map((item, idx) => (
                           <button 
                             key={idx}
                             title={item.name}
                             onClick={() => {
-                               if (!selectedTooth) {
-                                  alert("Selecione um dente primeiro no odontograma.");
-                                  return;
+                               const proc = findProcedureInCatalog(item.name);
+                               setSelectedTreatmentIcon(item.icon); 
+                               setSelectedTreatment(item.name); // SEMPRE usa o nome literal do carrossel
+                               if (proc) {
+                                  setSelectedTreatmentId(proc.id);
+                                  setSelectedProcedures([proc]);
+                                  setTreatmentValue(formatCurrencyInput(Math.round((proc.price || 0) * 100).toString()));
+                               } else {
+                                  setSelectedTreatmentId(null);
+                                  setSelectedProcedures([]);
+                                  setTreatmentValue("R$ 0,00");
                                }
-                               setObservation(prev => prev ? `${prev} | ${item.name}` : item.name);
+                               setManualTooth(selectedTooth ? selectedTooth.toString() : "");
                                setShowLaunchModal(true);
                             }}
-                            className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
+                            className="group relative flex flex-col items-center p-2 hover:bg-slate-50 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-100"
                           >
                              <img 
                                src={`/icones/app/${item.icon}`} 
                                alt={item.name} 
-                               className="w-7 h-7 object-contain transition-all group-hover:scale-110"
+                               className="w-6 h-6 object-contain transition-all group-hover:scale-110"
                              />
+                             <span className="text-[7px] font-black uppercase mt-1 text-slate-500 group-hover:text-blue-600 whitespace-nowrap">
+                               {item.name}
+                             </span>
                           </button>
-                       ))}
+                        ))
+                      }
+
+                      {/* Botão Dinâmico "Ver Tudo" da Especialidade */}
+                      <button 
+                        onClick={() => {
+                           const cat = intCategories.find(c => c.id === activeIntCategoryId);
+                           if (cat) {
+                              setExpandedCategories([cat.specialtyId]);
+                              setSelectedTreatment(null);
+                              setSelectedTreatmentId(null);
+                              setSelectedProcedures([]);
+                              setTreatmentValue("");
+                              setProcedureSearchTerm("");
+                              setManualTooth(selectedTooth ? selectedTooth.toString() : "");
+                              setShowLaunchModal(true);
+                           }
+                        }}
+                        className="group relative flex flex-col items-center p-2 hover:bg-blue-50 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-100 shrink-0"
+                      >
+                         <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
+                            <Plus size={14} />
+                         </div>
+                         <span className="text-[7px] font-black uppercase mt-1 text-blue-600 whitespace-nowrap">
+                            Ver Tudo
+                         </span>
+                      </button>
                     </div>
 
                     <button 
-                      onClick={() => setIntStartIndex(prev => (prev + 1) % 64)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                      onClick={() => {
+                        const items = intCategories.find(c => c.id === activeIntCategoryId)?.items || [];
+                        setSubIntStartIndex(prev => (prev + 1) % items.length);
+                      }}
+                      className="p-1 hover:bg-slate-50 rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
                     >
-                      <ChevronRight size={16} />
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="h-6 w-px bg-slate-200 mx-1" />
-
-              {/* Carrossel de Ícones de Especialidades/Tratamentos */}
-              <div className={cn(
-                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
-                isTreatmentsExpanded ? "max-w-[600px]" : "max-w-[48px]"
-              )}>
-                <button 
-                  onClick={() => {
-                    const next = !isTreatmentsExpanded;
-                    setIsTreatmentsExpanded(next);
-                    if (next) { setIsDiagExpanded(false); setIsIntExpanded(false); }
-                  }}
-                  className={cn(
-                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
-                    isTreatmentsExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
-                  )}
-                  title={isTreatmentsExpanded ? "Fechar" : "Abrir Tratamentos"}
-                >
-                  {isTreatmentsExpanded ? <X size={20} /> : <Grid size={20} />}
-                </button>
-
-                {isTreatmentsExpanded && (
-                  <>
-                    <button 
-                      onClick={() => setIconStartIndex(prev => (prev - 1 + 13) % 13)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
-                    >
-                      <ChevronLeft size={16} />
+                      <ChevronRight size={14} />
                     </button>
 
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {[
-                        { id: '1', name: 'Dentística', icon: 'esp_Dentística.bmp' },
-                        { id: '2', name: 'Prótese', icon: 'esp_Prótese.bmp' },
-                        { id: '3', name: 'Endodontia', icon: 'esp_Endodontia.bmp' },
-                        { id: '4', name: 'Periodontia', icon: 'esp_Periodontia.bmp' },
-                        { id: '5', name: 'Gerais', icon: 'esp_Gerais.bmp' },
-                        { id: '6', name: 'Cirurgia', icon: 'esp_Cirurgia.bmp' },
-                        { id: '7', name: 'Ortodontia', icon: 'esp_Ortodontia.bmp' },
-                        { id: '8', name: 'Prevenção', icon: 'esp_Prevenção.bmp' },
-                        { id: '9', name: 'Odontopediatria', icon: 'esp_Odontopediatria.bmp' },
-                        { id: '10', name: 'Diagnóstico', icon: 'esp_Diagnóstico.bmp' },
-                        { id: '11', name: 'Radiologia', icon: 'esp_Radiologia.bmp' },
-                        { id: '12', name: 'Estética', icon: 'esp_Estética.bmp' },
-                        { id: '13', name: 'Implantodontia', icon: 'esp_Implantodontia.bmp' },
-                      ].map((_, i, all) => all[(iconStartIndex + i) % all.length]).slice(0, 6).map((cat) => (
-                        <button
-                          key={cat.id}
-                          onClick={() => {
-                            setExpandedCategories([cat.id]);
-                            setShowLaunchModal(true);
-                          }}
-                          className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
-                          title={cat.name}
-                        >
-                          <img 
-                            src={`/icones/app/${cat.icon}`} 
-                            alt={cat.name} 
-                            className="w-9 h-9 object-contain transition-all" 
-                          />
-                        </button>
-                      ))}
-                    </div>
+                    <div className="h-6 w-px bg-slate-100 mx-1" />
 
                     <button 
-                      onClick={() => setIconStartIndex(prev => (prev + 1) % 13)}
-                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                      onClick={() => setActiveIntCategoryId(null)}
+                      className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                      title="Fechar Variações"
                     >
-                      <ChevronRight size={16} />
+                      <X size={14} />
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
 
               <div className="h-6 w-px bg-slate-200 mx-2" />
-              <button 
-                onClick={() => setShowPrescriptionModal(true)} 
-                className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
-                title="Receituário"
-              >
-                <img src="/icones/ReceiturarioIcone.png" alt="Receituário" className="w-8 h-8 object-contain transition-all" />
-              </button>
-              </>
-              )}
-              <button 
-                onClick={() => setShowAtestadoModal(true)} 
-                className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
-                title="Gerar Atestado"
-              >
-                <img src="/icones/AtestadoIcone.png" alt="Gerar Atestado" className="w-8 h-8 object-contain transition-all" />
-              </button>
-              {selectedPatient && (
+              
+              {/* Menu de Ferramentas Clínicas (Vertical Dropdown) */}
+              <div className="relative">
                 <button 
-                  onClick={() => setShowFilesModal(true)} 
-                  className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
-                  title="Arquivos"
+                  onClick={() => setIsActionMenuOpen(!isActionMenuOpen)} 
+                  className={cn(
+                    "p-2.5 rounded-xl transition-all shadow-sm border",
+                    isActionMenuOpen ? "bg-blue-600 text-white border-blue-700" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  )}
+                  title="Ferramentas Clínicas"
                 >
-                  <Folder className="w-8 h-8 text-slate-600 group-hover:text-blue-600 transition-all" />
+                  <Menu size={20} />
                 </button>
-              )}
-          
-          <div className="h-4 w-px bg-slate-200 mx-1" />
-          </div>
-          </header>
+
+                {isActionMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[140]" onClick={() => setIsActionMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="p-2 flex flex-col gap-1">
+                        <button 
+                          onClick={() => { setShowPrescriptionModal(true); setIsActionMenuOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-xl transition-all group"
+                        >
+                          <Pill size={18} className="text-slate-400 group-hover:text-blue-500" />
+                          <span className="text-[11px] font-black uppercase tracking-wider">Receituário</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => { setShowAtestadoModal(true); setIsActionMenuOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 text-slate-700 hover:text-emerald-600 rounded-xl transition-all group"
+                        >
+                          <FileBadge size={18} className="text-slate-400 group-hover:text-emerald-500" />
+                          <span className="text-[11px] font-black uppercase tracking-wider">Gerar Atestado</span>
+                        </button>
+
+                        {selectedPatient && (
+                          <button 
+                            onClick={() => { setShowFilesModal(true); setIsActionMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 text-slate-700 hover:text-amber-600 rounded-xl transition-all group border-t border-slate-50 mt-1"
+                          >
+                            <Folder size={18} className="text-slate-400 group-hover:text-amber-500" />
+                            <span className="text-[11px] font-black uppercase tracking-wider">Arquivos / Docs</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </header>
 
       <main className="flex-1 overflow-hidden flex flex-col p-3 gap-3">
         <div className="flex-1 bg-white rounded-[32px] border border-slate-200 shadow-sm relative flex flex-col items-center justify-center p-4 overflow-auto custom-scrollbar">
            <div className="absolute top-4 left-6 flex items-center gap-2 text-slate-300">
               <Shield size={16} /><span className="text-[9px] font-black uppercase tracking-[0.3em]">Odontograma</span>
            </div>
+
+           {selectedPatient && (
+             <div className="absolute top-4 right-6 z-30">
+               <button 
+                 onClick={() => setShowOdontoInfo(!showOdontoInfo)}
+                 className={cn(
+                   "w-6 h-6 rounded-full flex items-center justify-center border transition-all",
+                   showOdontoInfo ? "bg-blue-600 border-blue-700 text-white shadow-md" : "bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300"
+                 )}
+               >
+                 <span className="text-[12px] font-black italic">i</span>
+               </button>
+
+               {showOdontoInfo && (
+                 <>
+                   <div className="fixed inset-0 z-[35]" onClick={() => setShowOdontoInfo(false)} />
+                   <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[40] p-5 animate-in fade-in slide-in-from-top-2">
+                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2">Legenda do Odontograma</h4>
+                     
+                     <div className="space-y-4">
+                       <section className="space-y-2">
+                         <p className="text-[9px] font-black uppercase text-slate-500 mb-1.5">Cores de Fundo</p>
+                         <div className="grid grid-cols-2 gap-2">
+                           <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-white border border-slate-200" /><span className="text-[9px] font-bold text-slate-600 uppercase">Saudável</span></div>
+                           <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-rose-50 border border-rose-200" /><span className="text-[9px] font-bold text-slate-600 uppercase">Cárie</span></div>
+                           <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-blue-50 border border-blue-200" /><span className="text-[9px] font-bold text-slate-600 uppercase">Restauração</span></div>
+                           <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-50 border border-amber-200" /><span className="text-[9px] font-bold text-slate-600 uppercase">Prótese</span></div>
+                         </div>
+                       </section>
+
+                       <section className="space-y-2">
+                         <p className="text-[9px] font-black uppercase text-slate-500 mb-1.5">Símbolos e Marcas</p>
+                         <div className="space-y-2">
+                           <div className="flex items-center gap-3">
+                             <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-rose-500 font-black text-xs">X</div>
+                             <span className="text-[9px] font-bold text-slate-600 uppercase leading-tight">Dente Ausente / Extraído</span>
+                           </div>
+                           <div className="flex items-center gap-3">
+                             <div className="w-6 h-6 border-2 border-blue-500 bg-blue-100 rounded-sm" />
+                             <span className="text-[9px] font-bold text-slate-600 uppercase leading-tight">Faces Tratadas (Em Azul no envelope)</span>
+                           </div>
+                           <div className="flex items-center gap-3">
+                             <div className="w-6 h-1 bg-blue-600 rounded-full" />
+                             <span className="text-[9px] font-bold text-slate-600 uppercase leading-tight">Texto Azul: Nome do último procedimento</span>
+                           </div>
+                         </div>
+                       </section>
+
+                       <p className="text-[8px] font-medium text-slate-400 italic mt-2 leading-relaxed">
+                         O ícone do dente é atualizado automaticamente para refletir o desenho do último tratamento realizado.
+                       </p>
+                     </div>
+                   </div>
+                 </>
+               )}
+             </div>
+           )}
            
            {!selectedPatient ? (
               <div className="flex flex-col items-center justify-center text-slate-400 gap-4 mt-8">
@@ -1062,7 +1416,15 @@ export default function PatientRecordPage() {
                    <div className="flex justify-center items-end gap-1.5 flex-nowrap">
                       {upperJaw.map((n, i) => (
                         <div key={n} className="flex items-end gap-1 shrink-0">
-                           <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                           <DetailedTooth 
+                             number={n} 
+                             status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} 
+                             latestIcon={patientOdontograms[selectedPatient?.id || ""]?.[n]?.latestIcon}
+                             procedureName={patientOdontograms[selectedPatient?.id || ""]?.[n]?.procedureName}
+                             surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} 
+                             onSelect={handleToothClick} 
+                             isSelected={selectedTooth === n} 
+                           />
                            {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
                         </div>
                       ))}
@@ -1070,7 +1432,15 @@ export default function PatientRecordPage() {
                    <div className="flex justify-center items-start gap-1.5 flex-nowrap">
                       {lowerJaw.map((n, i) => (
                         <div key={n} className="flex items-start gap-1 shrink-0">
-                           <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                           <DetailedTooth 
+                             number={n} 
+                             status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} 
+                             latestIcon={patientOdontograms[selectedPatient?.id || ""]?.[n]?.latestIcon}
+                             procedureName={patientOdontograms[selectedPatient?.id || ""]?.[n]?.procedureName}
+                             surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} 
+                             onSelect={handleToothClick} 
+                             isSelected={selectedTooth === n} 
+                           />
                            {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
                         </div>
                       ))}
@@ -1104,47 +1474,11 @@ export default function PatientRecordPage() {
                   }
                 `}</style>
                  {history.filter(h => !h.procedure.includes("Alteração Odontograma")).map((item, idx) => (
-                   <div key={idx} onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} className="w-72 shrink-0 p-5 rounded-3xl border border-slate-100 bg-white flex flex-col gap-3 hover:shadow-xl transition-all cursor-pointer">
-                      <div className="flex justify-between items-start">
-                         <span className="text-[10px] font-black text-slate-400 uppercase">
-  {(() => {
-    const [y, m, d] = item.date.split('-');
-    return `${d}/${m}/${y}`;
-  })()}
-</span>
-                         <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Dente {item.tooth}</span>
-                      </div>
-                      <div className="flex-1 min-h-[40px]">
-                        {item.procedure.includes("Receitado:") ? (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 text-blue-600">
-                              <FileText size={14} className="shrink-0" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">Receituário</span>
-                            </div>
-                            <p className="text-[12px] font-bold text-slate-700 leading-tight line-clamp-2 italic">
-                              {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()}
-                            </p>
-                          </div>
-                        ) : (
-                          <h4 className="text-[12px] font-black text-slate-800 uppercase line-clamp-2 leading-tight">
-                            {item.procedure}
-                          </h4>
-                        )}
-                      </div>                      <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-50">
-                         <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[100px]">{item.professional}</span>
-                            <span className={cn(
-                               "text-[9px] font-black uppercase mt-1",
-                               (item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                               {(item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "Pago Total" : `Pendente (${item.paidInstallments || 0}/${Number(item.totalInstallments || item.installments) || 1})`}
-                            </span>
-                         </div>
-                         <span className="text-[12px] font-black text-emerald-600">
-                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.numericValue || item.value)}
-                         </span>
-                      </div>
-                   </div>
+                   <HistoryItem 
+                     key={idx} 
+                     item={item} 
+                     onClick={() => { setActiveHistoryItem(item); setShowDetailsModal(true); }} 
+                   />
                  ))}
               </div>
            </div>
@@ -1854,6 +2188,83 @@ export default function PatientRecordPage() {
         <FilesModal isOpen={showFilesModal} onClose={() => setShowFilesModal(false)} patientId={selectedPatient.id} patientName={selectedPatient.name} interventions={history.filter(h => h.type === 'intervention')} initialSelectedIntervention={initialFilesIntervention} />
       )}
       <DetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} item={activeHistoryItem} />
+    </div>
+  );
+}
+
+function HistoryItem({ item, onClick }: { item: any, onClick: () => void }) {
+  const isRecipe = item.procedure.includes("Receitado:");
+  const isAtestado = item.procedure.includes("Atestado:");
+  const isDiag = item.procedure.includes("DIAGNÓSTICO:");
+
+  return (
+    <div onClick={onClick} className="w-72 shrink-0 p-5 rounded-3xl border border-slate-100 bg-white flex flex-col gap-3 hover:shadow-xl transition-all cursor-pointer">
+       <div className="flex items-center justify-between mb-2">
+           <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full">
+              {(() => {
+                const [y, m, d] = item.date.split('-');
+                return `${d}/${m}/${y}`;
+              })()}
+           </span>
+           {item.tooth && !isRecipe && !isAtestado && (
+             <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Dente {item.tooth}</span>
+           )}
+        </div>
+       <div className="flex-1 min-h-[40px]">
+         {isRecipe ? (
+           <div className="space-y-1">
+             <div className="flex items-center gap-1.5 text-blue-600">
+               <FileText size={14} className="shrink-0" />
+               <span className="text-[10px] font-black uppercase tracking-wider">Receituário</span>
+             </div>
+             <p className="text-[12px] font-bold text-slate-700 leading-tight line-clamp-2 italic">
+               {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").replace(/Receitado:\s*/i, "").trim()}
+             </p>
+           </div>
+         ) : isAtestado ? (
+           <div className="space-y-1">
+             <div className="flex items-center gap-1.5 text-emerald-600">
+               <FileBadge size={14} className="shrink-0" />
+               <span className="text-[10px] font-black uppercase tracking-wider">Atestado Gerado</span>
+             </div>
+             <p className="text-[12px] font-bold text-slate-700 leading-tight line-clamp-2 italic">
+               {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}
+             </p>
+           </div>
+         ) : isDiag ? (
+           <div className="space-y-1">
+             <div className="flex items-center gap-1.5 text-amber-500">
+               <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+               <span className="text-[10px] font-black uppercase tracking-wider">Diagnóstico Clínico</span>
+             </div>
+             <h4 className="text-[12px] font-black text-slate-800 uppercase line-clamp-2 leading-tight">
+               {item.procedure.replace(/DIAGNÓSTICO:\s*/i, "").trim()}
+             </h4>
+           </div>
+         ) : (
+           <h4 className="text-[12px] font-black text-slate-800 uppercase line-clamp-2 leading-tight">
+             {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}
+           </h4>
+         )}
+       </div>                      
+       <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-50">
+          <div className="flex flex-col">
+             <span className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[100px]">{item.professional}</span>
+             {!isRecipe && !isAtestado && !isDiag && (
+                <span className={cn(
+                   "text-[9px] font-black uppercase mt-1",
+                   (item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "text-emerald-600" : "text-rose-600"
+                )}>
+                   {(item.paidInstallments || 0) >= (Number(item.totalInstallments || item.installments) || 1) ? "Pago Total" : `Pendente (${item.paidInstallments || 0}/${Number(item.totalInstallments || item.installments) || 1})`}
+                </span>
+             )}
+          </div>
+          {!isRecipe && !isAtestado && !isDiag && (
+             <span className="text-[12px] font-black text-emerald-600">
+               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.numericValue || item.value)}
+             </span>
+          )}
+       </div>
     </div>
   );
 }

@@ -11,7 +11,18 @@ export async function DELETE(
     const { id: nropac, fileId } = await params;
     const db = await getDb();
 
-    // 1. Get file path from DB
+    // 1. Handle Virtual Documents (LOG_DOCUMENTO)
+    if (fileId.startsWith("DOC_")) {
+      const docId = fileId.replace("DOC_", "");
+      await db.run(
+        `DELETE FROM LOG_DOCUMENTO WHERE ID_DOCUMENTO = ? AND NROPAC = ?`,
+        [docId, nropac]
+      );
+      await db.close();
+      return NextResponse.json({ success: true });
+    }
+
+    // 2. Handle Physical Files (ARQUIVO_PACIENTE)
     const arquivo = await db.get(
       `SELECT PATH FROM ARQUIVO_PACIENTE WHERE ID = ? AND NROPAC = ?`,
       [fileId, nropac]

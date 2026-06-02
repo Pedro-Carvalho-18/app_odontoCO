@@ -12,9 +12,7 @@ export function Tooth({ number, className }: ToothProps) {
   const [status, setStatus] = useState<"none" | "carie" | "restauracao" | "extraido">("none");
 
   const handleClick = () => {
-    const statuses: Array<typeof status> = ["none", "carie", "restauracao", "extraido"];
-    const nextIndex = (statuses.indexOf(status) + 1) % statuses.length;
-    setStatus(statuses[nextIndex]);
+    // Status cycling removed.
   };
 
   const getStatusColor = () => {

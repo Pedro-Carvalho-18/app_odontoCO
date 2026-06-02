@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type ToothStatus = "healthy" | "caries" | "restoration" | "absent" | "prosthesis";
@@ -7,6 +8,8 @@ export type ToothStatus = "healthy" | "caries" | "restoration" | "absent" | "pro
 interface ToothProps {
   number: number;
   status?: ToothStatus;
+  latestIcon?: string;
+  procedureName?: string;
   isSelected?: boolean;
   surfaces?: {
     top: boolean;
@@ -34,6 +37,8 @@ const getIconPath = (number: number) => {
 export function DetailedTooth({ 
   number, 
   status = "healthy", 
+  latestIcon,
+  procedureName,
   isSelected = false, 
   surfaces, 
   className, 
@@ -52,25 +57,21 @@ export function DetailedTooth({
 
   const cycleStatus = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const statuses: ToothStatus[] = ["healthy", "caries", "restoration", "absent", "prosthesis"];
-    const nextIndex = (statuses.indexOf(safeStatus) + 1) % statuses.length;
-    if (onChange) onChange(number, statuses[nextIndex], safeSurfaces);
     if (onSelect) onSelect(number);
   };
 
   const toggleSurface = (e: React.MouseEvent, surface: keyof typeof safeSurfaces) => {
     e.stopPropagation();
-    if (onChange) {
-      onChange(number, safeStatus, { ...safeSurfaces, [surface]: !safeSurfaces[surface] });
-    }
     if (onSelect) onSelect(number);
   };
 
-  const iconPath = getIconPath(number);
+  const defaultIconPath = getIconPath(number);
+  const [imgError, setImgError] = useState(false);
+  const treatmentIconPath = (latestIcon && !imgError) ? `/icones/app/${latestIcon}` : null;
 
   return (
     <div 
-      className={cn("flex flex-col items-center select-none w-[58px] shrink-0", className)}
+      className={cn("flex flex-col items-center select-none w-[58px] shrink-0 group relative", className)}
       onClick={() => onSelect?.(number)}
     >
       <span className={cn(
@@ -94,22 +95,32 @@ export function DetailedTooth({
           <div className="text-rose-500 font-black text-2xl">X</div>
         ) : (
           <div className="relative w-full h-full flex items-center justify-center">
+            {/* Base Tooth Visual */}
             <img 
-              src={iconPath} 
+              src={treatmentIconPath || defaultIconPath} 
               alt={`Dente ${number}`} 
+              onError={() => setImgError(true)}
               className={cn(
                 "max-w-full max-h-full object-contain transition-all duration-300",
-                safeStatus === "caries" && "sepia brightness-50 hue-rotate-[320deg] saturate-[5]",
-                safeStatus === "restoration" && "sepia brightness-75 hue-rotate-[180deg] saturate-[3]",
-                safeStatus === "prosthesis" && "sepia brightness-90 hue-rotate-[40deg] saturate-[2]"
+                !latestIcon && safeStatus === "caries" && "sepia brightness-50 hue-rotate-[320deg] saturate-[5]",
+                !latestIcon && safeStatus === "restoration" && "sepia brightness-75 hue-rotate-[180deg] saturate-[3]",
+                !latestIcon && safeStatus === "prosthesis" && "sepia brightness-90 hue-rotate-[40deg] saturate-[2]"
               )}
             />
+          </div>
+        )}
+
+        {/* Tooltip for Procedure Name */}
+        {procedureName && (
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[9px] font-black uppercase rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[100]">
+            {procedureName}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
           </div>
         )}
       </div>
 
       {/* Professional Surface Selector (Odontogram Envelope) */}
-      <div className="mt-2 relative w-[46px] h-[46px] rounded-lg overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0">
+      <div className="mt-1 relative w-[36px] h-[36px] rounded-sm overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0">
         <div 
           className={cn("absolute inset-0 transition-colors cursor-pointer", safeSurfaces.top ? "bg-blue-500" : "bg-slate-100 hover:bg-slate-200")}
           style={{ clipPath: "polygon(0 0, 100% 0, 70% 30%, 30% 30%)" }}
@@ -144,17 +155,6 @@ export function DetailedTooth({
              <rect x="30" y="30" width="40" height="40" fill="none" stroke="#cbd5e1" strokeWidth="4" strokeLinejoin="round" />
           </svg>
         </div>
-      </div>
-
-      <div className={cn(
-        "text-[10px] font-black uppercase mt-1 px-1.5 rounded-full leading-none tracking-tighter",
-        safeStatus === "healthy" && "opacity-0",
-        safeStatus === "absent" && "bg-rose-100 text-rose-700",
-        safeStatus === "caries" && "bg-rose-600 text-white",
-        safeStatus === "restoration" && "bg-blue-600 text-white",
-        safeStatus === "prosthesis" && "bg-amber-600 text-white"
-      )}>
-        {safeStatus.slice(0, 3)}
       </div>
     </div>
   );

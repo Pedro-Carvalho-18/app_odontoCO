@@ -60,21 +60,30 @@ export async function POST(
           const lastTraRow = await db.get("SELECT MAX(CAST(NROTRA AS INTEGER)) as id FROM INTERVENCAO");
           const nextTraId = (Number(lastTraRow?.id) || 0) + 1;
 
+          const observText = inter.procedure?.startsWith("Atestado")
+            ? `${inter.procedure} | ${inter.notes}`
+            : inter.notes?.startsWith("DIAGNÓSTICO:")
+              ? inter.notes
+              : inter.notes?.startsWith("PROCEDIMENTO:")
+                ? inter.notes
+                : `PROCEDIMENTO: ${inter.procedure} | ${inter.notes}`;
+
           await db.run(
             `INSERT INTO INTERVENCAO (
-              NROPAC, NROINTPAC, NROTRA, ID_PRESTADOR, NROINT, 
+              NROPAC, NROINTPAC, NROTRA, ID_PRESTADOR, NROTAB, NROINT, 
               DATCAD, STATUS, OBSERV, VALOR_PACIENTE, S_DENTES,
               USER_STAMP_INS, TIME_STAMP_INS
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               patientId,
               nextNroIntPac.toString(),
               nextTraId.toString(),
               inter.professionalId || '1',
+              '1',
               inter.procedureId || '0',
               formattedDate,
               inter.status === 'Concluído' ? '2' : '1',
-              `PROCEDIMENTO: ${inter.procedure} | ${inter.notes}`,
+              observText,
               inter.numericValue || 0,
               inter.tooth || '',
               '1',
@@ -146,9 +155,48 @@ export async function POST(
             console.log(`[SAVE] Saving tooth ${toothNum} with status: ${inter.toothData.status}`);
             const internalId = getInternalToothId(toothNum);
             const status = inter.toothData.status;
-            let bitmap = statusMap[status] || '';
+            let bitmap = '';
             
-            if (bitmap && bitmap !== 'arc_EXTRACAO_s') {
+            // PRIORITY 1: 100% Fidelity - Use the exact icon filename provided by the client
+            if (inter.toothData.latestIcon) {
+              bitmap = `icon:${inter.toothData.latestIcon}`;
+              console.log(`[SAVE] Storing literal icon reference for exact match: ${bitmap}`);
+            }
+            
+            // PRIORITY 2: Fallback to Procedure-based lookup (if no specific icon was selected from carousel)
+            if (!bitmap && inter.procedureId && inter.procedureId !== '0') {
+              const procSymbol = await db.get(
+                `SELECT S.BITMAP1 
+                 FROM TAB_PRC_ITEM PRC
+                 JOIN __SIMBOLO_ODONTO S ON PRC.NROSIM = S.NROSIM
+                 WHERE (PRC.NROPROCTAB = ? OR PRC.ID_PRC_GEN = ?) AND PRC.NROTAB = '1'
+                 LIMIT 1`,
+                [inter.procedureId, inter.procedureId]
+              ) || await db.get(
+                `SELECT S.BITMAP1
+                 FROM TAB_GEN_ITEM GEN
+                 JOIN __SIMBOLO_ODONTO S ON GEN.ID_SIMBOLO = S.NROSIM
+                 WHERE GEN.ID_PRC_GEN = ?
+                 LIMIT 1`,
+                [inter.procedureId]
+              );
+
+              if (procSymbol?.BITMAP1) {
+                bitmap = `arc_${procSymbol.BITMAP1}`;
+                console.log(`[SAVE] Fallback: Found bitmap from procedure ${inter.procedureId}: ${bitmap}`);
+              }
+            }
+            
+            // PRIORITY 3: Generic status mapping (last resort)
+            if (!bitmap) {
+              bitmap = statusMap[status] || '';
+              if (bitmap && bitmap !== 'arc_EXTRACAO_s') {
+                bitmap = `${bitmap}_${toothNum}`;
+              }
+            }
+
+            // Append tooth number to arc_ bitmaps if not already present
+            if (bitmap.startsWith('arc_') && bitmap !== 'arc_EXTRACAO_s' && !bitmap.includes(toothNum.toString())) {
               bitmap = `${bitmap}_${toothNum}`;
             }
 
