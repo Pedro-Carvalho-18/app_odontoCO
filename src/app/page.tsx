@@ -21,6 +21,7 @@ import {
   MousePointer2,
   X,
   FileEdit,
+  Folder,
   FolderOpen,
   Upload,
   Clock,
@@ -188,6 +189,7 @@ export default function PatientRecordPage() {
   const [isProfessionalExpanded, setIsProfessionalExpanded] = useState(false);
   const [isConvenioExpanded, setIsConvenioExpanded] = useState(false);
   const [procedureSearchTerm, setProcedureSearchTerm] = useState("");
+  const [isProcedureSearchFocused, setIsProcedureSearchFocused] = useState(false);
   const [treatmentValue, setTreatmentValue] = useState("");
   const [observation, setObservation] = useState("");
   const [installments, setInstallments] = useState("1");
@@ -278,6 +280,12 @@ export default function PatientRecordPage() {
   const [patientOdontograms, setPatientOdontograms] = useState<Record<string, Record<number, { status: ToothStatus; surfaces: any }>>>({});
   const [modifiedTeeth, setModifiedTeeth] = useState<Record<string, number[]>>({});
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [iconStartIndex, setIconStartIndex] = useState(0);
+  const [diagStartIndex, setDiagStartIndex] = useState(0);
+  const [intStartIndex, setIntStartIndex] = useState(0);
+  const [isDiagExpanded, setIsDiagExpanded] = useState(false);
+  const [isIntExpanded, setIsIntExpanded] = useState(false);
+  const [isTreatmentsExpanded, setIsTreatmentsExpanded] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -658,61 +666,383 @@ export default function PatientRecordPage() {
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans">
       <header className="w-full px-6 py-2 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 z-50 shadow-sm gap-4">
-        {/* ... existing header content ... */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input type="text" placeholder="Pesquisar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)} className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold outline-none" />
-          {(isSearchFocused || searchTerm) && patients.length > 0 && (
-            <div 
-              className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto custom-scrollbar"
-              onScroll={handleSearchScroll}
-            >
-              {patients.map(p => (
-                <button key={p.id} onClick={() => {setSelectedPatient(p); setSearchTerm("");}} className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-xs font-black">{p.name[0]}</div>
-                  <span className="font-black text-xs uppercase">{p.name}</span>
-                </button>
-              ))}
-              {loadingMore && (
-                <div className="p-3 text-center">
-                  <Loader2 size={16} className="animate-spin mx-auto text-blue-600" />
-                </div>
-              )}
+        <div className="flex items-center gap-4">
+          {/* Search Bar (Expandable on hover) */}
+          <div className="relative group">
+            <div className={cn(
+              "flex items-center bg-slate-100 border border-slate-200 rounded-xl transition-all duration-500 ease-in-out h-10 overflow-hidden",
+              searchTerm || isSearchFocused ? "w-80 shadow-md bg-white border-blue-200" : "w-10 hover:w-80 hover:shadow-md hover:bg-white hover:border-blue-200"
+            )}>
+              <div className="min-w-[40px] flex items-center justify-center text-slate-400">
+                <Search size={18} />
+              </div>
+              <input 
+                type="text" 
+                placeholder="Pesquisar paciente..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                onFocus={() => setIsSearchFocused(true)} 
+                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)} 
+                className={cn(
+                  "w-full bg-transparent outline-none text-xs font-bold pr-4 transition-opacity duration-300",
+                  searchTerm || isSearchFocused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )} 
+              />
             </div>
+
+            {(isSearchFocused || searchTerm) && patients.length > 0 && (
+              <div 
+                className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2"
+                onScroll={handleSearchScroll}
+              >
+                {patients.map(p => (
+                  <button key={p.id} onClick={() => {setSelectedPatient(p); setSearchTerm("");}} className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-xs font-black">{p.name[0]}</div>
+                    <span className="font-black text-xs uppercase">{p.name}</span>
+                  </button>
+                ))}
+                {loadingMore && (
+                  <div className="p-3 text-center">
+                    <Loader2 size={16} className="animate-spin mx-auto text-blue-600" />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Patient Profile */}
+          {selectedPatient && (
+            <button 
+              onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} 
+              className="flex items-center gap-2.5 px-4 py-2 bg-slate-100 rounded-xl border border-slate-200 text-[12px] font-black uppercase hover:bg-slate-200 transition-colors shadow-sm whitespace-nowrap" 
+              title="Ver Perfil do Paciente"
+            >
+              <User size={16} className="text-blue-600" />
+              <span className="text-slate-800">{selectedPatient.name}</span>
+            </button>
           )}
         </div>
+
         <div className="flex items-center gap-2">
           {selectedPatient && (
             <>
-              <button onClick={() => router.push(`/pacientes/${selectedPatient.id}?tab=dados`)} className="flex items-center gap-2.5 px-4 py-2 bg-slate-100 rounded-xl border border-slate-200 text-[12px] font-black uppercase hover:bg-slate-200 transition-colors shadow-sm" title="Ver Perfil do Paciente">
-                <User size={16} className="text-blue-600" />
-                <span className="text-slate-800">{selectedPatient.name}</span>
-              </button>
+              {/* Carrossel de Ícones de Diagnóstico */}
+              <div className={cn(
+                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-2 transition-all duration-500 overflow-hidden",
+                isDiagExpanded ? "max-w-[500px]" : "max-w-[48px]"
+              )}>
+                <button 
+                  onClick={() => {
+                    const next = !isDiagExpanded;
+                    setIsDiagExpanded(next);
+                    if (next) { setIsIntExpanded(false); setIsTreatmentsExpanded(false); }
+                  }}
+                  className={cn(
+                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                    isDiagExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
+                  )}
+                  title={isDiagExpanded ? "Fechar" : "Abrir Diagnóstico"}
+                >
+                  {isDiagExpanded ? <X size={20} /> : <Activity size={20} />}
+                </button>
+
+                {isDiagExpanded && (
+                  <>
+                    <button 
+                      onClick={() => setDiagStartIndex(prev => (prev - 1 + 18) % 18)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <div className="flex items-center gap-0.5 shrink-0">
+                       {[
+                          { name: 'Aus. Coroa', icon: 'dia_auscoroa.bmp' },
+                          { name: 'Aus. Raiz', icon: 'dia_ausraiz.bmp' },
+                          { name: 'Descalcif.', icon: 'dia_descalcif.bmp' },
+                          { name: 'Distal', icon: 'dia_distal.bmp' },
+                          { name: 'Erosão', icon: 'dia_erosao.bmp' },
+                          { name: 'Extrusão', icon: 'dia_extrusao.bmp' },
+                          { name: 'Fissura', icon: 'dia_fissura.bmp' },
+                          { name: 'Fluorose', icon: 'dia_fluorose.bmp' },
+                          { name: 'Fratura', icon: 'dia_fratura.bmp' },
+                          { name: 'Giroversão', icon: 'dia_giroversao.bmp' },
+                          { name: 'Impactado', icon: 'dia_impactado.bmp' },
+                          { name: 'Incluso', icon: 'dia_incluso.bmp' },
+                          { name: 'Intrusão', icon: 'dia_intrusao.bmp' },
+                          { name: 'Lesão', icon: 'dia_lesao.bmp' },
+                          { name: 'Mesial', icon: 'dia_mesial.bmp' },
+                          { name: 'Semi', icon: 'dia_semi.bmp' },
+                          { name: 'Supranum.', icon: 'dia_supranum.bmp' },
+                          { name: 'Trepanacao', icon: 'dia_trepanacao.bmp' },
+                       ].map((_, i, all) => all[(diagStartIndex + i) % all.length]).slice(0, 4).map((item, idx) => (
+                          <button 
+                            key={idx}
+                            title={item.name}
+                            onClick={() => {
+                               if (!selectedTooth) {
+                                  alert("Selecione um dente primeiro no odontograma.");
+                                  return;
+                               }
+                               setObservation(prev => prev ? `${prev} | ${item.name}` : item.name);
+                               setShowLaunchModal(true);
+                            }}
+                            className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
+                          >
+                             <img 
+                               src={`/icones/app/${item.icon}`} 
+                               alt={item.name} 
+                               className="w-7 h-7 object-contain transition-all group-hover:scale-110"
+                             />
+                          </button>
+                       ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setDiagStartIndex(prev => (prev + 1) % 18)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="h-6 w-px bg-slate-200 mx-1" />
+
+              {/* Carrossel de Ícones de Intervenções (int_) */}
+              <div className={cn(
+                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
+                isIntExpanded ? "max-w-[500px]" : "max-w-[48px]"
+              )}>
+                <button 
+                  onClick={() => {
+                    const next = !isIntExpanded;
+                    setIsIntExpanded(next);
+                    if (next) { setIsDiagExpanded(false); setIsTreatmentsExpanded(false); }
+                  }}
+                  className={cn(
+                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                    isIntExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
+                  )}
+                  title={isIntExpanded ? "Fechar" : "Abrir Intervenções"}
+                >
+                  {isIntExpanded ? <X size={20} /> : <Zap size={20} />}
+                </button>
+
+                {isIntExpanded && (
+                  <>
+                    <button 
+                      onClick={() => setIntStartIndex(prev => (prev - 1 + 64) % 64)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <div className="flex items-center gap-0.5 shrink-0">
+                       {[
+                          { name: 'Adesiva', icon: 'int_adesiva.bmp' },
+                          { name: 'Ajuste', icon: 'int_ajuste.bmp' },
+                          { name: 'Apicecto', icon: 'int_apicecto.bmp' },
+                          { name: 'Attach', icon: 'int_attach.bmp' },
+                          { name: 'Aumen', icon: 'int_aumen.bmp' },
+                          { name: 'Banda', icon: 'int_banda.bmp' },
+                          { name: 'Bloco', icon: 'int_bloco.bmp' },
+                          { name: 'Boticao', icon: 'int_boticao.bmp' },
+                          { name: 'Bracket', icon: 'int_bracket.bmp' },
+                          { name: 'Bran', icon: 'int_bran.bmp' },
+                          { name: 'Byte', icon: 'int_byte.bmp' },
+                          { name: 'Canal', icon: 'int_canal.bmp' },
+                          { name: 'Capea', icon: 'int_capea.bmp' },
+                          { name: 'Cirur', icon: 'int_cirur.bmp' },
+                          { name: 'Consulta', icon: 'int_consulta.bmp' },
+                          { name: 'Coroa', icon: 'int_coroa.bmp' },
+                          { name: 'Desgas', icon: 'int_desgas.bmp' },
+                          { name: 'Eho', icon: 'int_eho.bmp' },
+                          { name: 'Emerg', icon: 'int_emerg.bmp' },
+                          { name: 'Enxerto', icon: 'int_enxerto.bmp' },
+                          { name: 'Escova', icon: 'int_escova.bmp' },
+                          { name: 'Faceta', icon: 'int_faceta.bmp' },
+                          { name: 'Fixa', icon: 'int_fixa.bmp' },
+                          { name: 'Fluor', icon: 'int_fluor.bmp' },
+                          { name: 'Fotos', icon: 'int_fotos.bmp' },
+                          { name: 'Frenec', icon: 'int_frenec.bmp' },
+                          { name: 'Gengivec', icon: 'int_gengivec.bmp' },
+                          { name: 'Hemi', icon: 'int_hemi.bmp' },
+                          { name: 'Implante', icon: 'int_implante.bmp' },
+                          { name: 'Lateral', icon: 'int_lateral.bmp' },
+                          { name: 'Mantene', icon: 'int_mantene.bmp' },
+                          { name: 'Manut', icon: 'int_manut.bmp' },
+                          { name: 'Manuten', icon: 'int_manuten.bmp' },
+                          { name: 'Maopunho', icon: 'int_maopunho.bmp' },
+                          { name: 'Modelo', icon: 'int_modelo.bmp' },
+                          { name: 'Mordida', icon: 'int_mordida.bmp' },
+                          { name: 'Movel', icon: 'int_movel.bmp' },
+                          { name: 'Nucleo', icon: 'int_nucleo.bmp' },
+                          { name: 'Oclusal', icon: 'int_oclusal.bmp' },
+                          { name: 'Panoram', icon: 'int_panoram.bmp' },
+                          { name: 'Peric', icon: 'int_peric.bmp' },
+                          { name: 'Placa', icon: 'int_placa.bmp' },
+                          { name: 'Poli', icon: 'int_poli.bmp' },
+                          { name: 'Prof', icon: 'int_prof.bmp' },
+                          { name: 'Protese', icon: 'int_protese.bmp' },
+                          { name: 'Provele', icon: 'int_provele.bmp' },
+                          { name: 'Provgru', icon: 'int_provgru.bmp' },
+                          { name: 'Pulpo', icon: 'int_pulpo.bmp' },
+                          { name: 'Raiox', icon: 'int_raiox.bmp' },
+                          { name: 'Raspagem', icon: 'int_raspagem.bmp' },
+                          { name: 'Raspger', icon: 'int_raspger.bmp' },
+                          { name: 'Reemb', icon: 'int_reemb.bmp' },
+                          { name: 'Remove', icon: 'int_remove.bmp' },
+                          { name: 'Restaura', icon: 'int_restaura.bmp' },
+                          { name: 'RestDO', icon: 'int_RestDO.bmp' },
+                          { name: 'RestMO', icon: 'int_RestMO.bmp' },
+                          { name: 'RestMOD', icon: 'int_RestMOD.bmp' },
+                          { name: 'RestO', icon: 'int_RestO.bmp' },
+                          { name: 'Retalho', icon: 'int_retalho.bmp' },
+                          { name: 'Rizec', icon: 'int_rizec.bmp' },
+                          { name: 'Selante', icon: 'int_selante.bmp' },
+                          { name: 'Total', icon: 'int_total.bmp' },
+                          { name: 'Tunel', icon: 'int_tunel.bmp' },
+                          { name: 'Ulecto', icon: 'int_ulecto.bmp' },
+                       ].map((_, i, all) => all[(intStartIndex + i) % all.length]).slice(0, 4).map((item, idx) => (
+                          <button 
+                            key={idx}
+                            title={item.name}
+                            onClick={() => {
+                               if (!selectedTooth) {
+                                  alert("Selecione um dente primeiro no odontograma.");
+                                  return;
+                               }
+                               setObservation(prev => prev ? `${prev} | ${item.name}` : item.name);
+                               setShowLaunchModal(true);
+                            }}
+                            className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
+                          >
+                             <img 
+                               src={`/icones/app/${item.icon}`} 
+                               alt={item.name} 
+                               className="w-7 h-7 object-contain transition-all group-hover:scale-110"
+                             />
+                          </button>
+                       ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setIntStartIndex(prev => (prev + 1) % 64)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="h-6 w-px bg-slate-200 mx-1" />
+
+              {/* Carrossel de Ícones de Especialidades/Tratamentos */}
+              <div className={cn(
+                "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
+                isTreatmentsExpanded ? "max-w-[600px]" : "max-w-[48px]"
+              )}>
+                <button 
+                  onClick={() => {
+                    const next = !isTreatmentsExpanded;
+                    setIsTreatmentsExpanded(next);
+                    if (next) { setIsDiagExpanded(false); setIsIntExpanded(false); }
+                  }}
+                  className={cn(
+                    "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                    isTreatmentsExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
+                  )}
+                  title={isTreatmentsExpanded ? "Fechar" : "Abrir Tratamentos"}
+                >
+                  {isTreatmentsExpanded ? <X size={20} /> : <Grid size={20} />}
+                </button>
+
+                {isTreatmentsExpanded && (
+                  <>
+                    <button 
+                      onClick={() => setIconStartIndex(prev => (prev - 1 + 13) % 13)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {[
+                        { id: '1', name: 'Dentística', icon: 'esp_Dentística.bmp' },
+                        { id: '2', name: 'Prótese', icon: 'esp_Prótese.bmp' },
+                        { id: '3', name: 'Endodontia', icon: 'esp_Endodontia.bmp' },
+                        { id: '4', name: 'Periodontia', icon: 'esp_Periodontia.bmp' },
+                        { id: '5', name: 'Gerais', icon: 'esp_Gerais.bmp' },
+                        { id: '6', name: 'Cirurgia', icon: 'esp_Cirurgia.bmp' },
+                        { id: '7', name: 'Ortodontia', icon: 'esp_Ortodontia.bmp' },
+                        { id: '8', name: 'Prevenção', icon: 'esp_Prevenção.bmp' },
+                        { id: '9', name: 'Odontopediatria', icon: 'esp_Odontopediatria.bmp' },
+                        { id: '10', name: 'Diagnóstico', icon: 'esp_Diagnóstico.bmp' },
+                        { id: '11', name: 'Radiologia', icon: 'esp_Radiologia.bmp' },
+                        { id: '12', name: 'Estética', icon: 'esp_Estética.bmp' },
+                        { id: '13', name: 'Implantodontia', icon: 'esp_Implantodontia.bmp' },
+                      ].map((_, i, all) => all[(iconStartIndex + i) % all.length]).slice(0, 6).map((cat) => (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            setExpandedCategories([cat.id]);
+                            setShowLaunchModal(true);
+                          }}
+                          className="group relative flex flex-col items-center p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200"
+                          title={cat.name}
+                        >
+                          <img 
+                            src={`/icones/app/${cat.icon}`} 
+                            alt={cat.name} 
+                            className="w-9 h-9 object-contain transition-all" 
+                          />
+                        </button>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setIconStartIndex(prev => (prev + 1) % 13)}
+                      className="p-1 hover:bg-white rounded-full text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+
               <div className="h-6 w-px bg-slate-200 mx-2" />
-              <button onClick={() => setShowLaunchModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Novo Lançamento"><Stethoscope size={20} /></button>
-              <button onClick={() => setShowPrescriptionModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Receituário"><Pill size={20} /></button>
+              <button 
+                onClick={() => setShowPrescriptionModal(true)} 
+                className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
+                title="Receituário"
+              >
+                <img src="/icones/ReceiturarioIcone.png" alt="Receituário" className="w-8 h-8 object-contain transition-all" />
+              </button>
               </>
               )}
-              <button onClick={() => setShowAtestadoModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Gerar Atestado"><FileEdit size={20} /></button>
+              <button 
+                onClick={() => setShowAtestadoModal(true)} 
+                className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
+                title="Gerar Atestado"
+              >
+                <img src="/icones/AtestadoIcone.png" alt="Gerar Atestado" className="w-8 h-8 object-contain transition-all" />
+              </button>
               {selectedPatient && (
-                <button onClick={() => setShowFilesModal(true)} className="p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-all" title="Arquivos"><FolderOpen size={20} /></button>
+                <button 
+                  onClick={() => setShowFilesModal(true)} 
+                  className="group p-2 hover:bg-slate-100 rounded-xl transition-all" 
+                  title="Arquivos"
+                >
+                  <Folder className="w-8 h-8 text-slate-600 group-hover:text-blue-600 transition-all" />
+                </button>
               )}
           
           <div className="h-4 w-px bg-slate-200 mx-1" />
-
-          {isAutoSaving ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-lg animate-pulse">
-              <Loader2 size={12} className="animate-spin" />
-              <span className="text-[10px] font-black uppercase">Sincronizando...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-2 text-slate-400">
-              <CheckCircle2 size={12} className="text-emerald-500" />
-              <span className="text-[10px] font-black uppercase">Sincronizado</span>
-            </div>
-          )}
-        </div>
-      </header>
+          </div>
+          </header>
 
       <main className="flex-1 overflow-hidden flex flex-col p-3 gap-3">
         <div className="flex-1 bg-white rounded-[32px] border border-slate-200 shadow-sm relative flex flex-col items-center justify-center p-4 overflow-auto custom-scrollbar">
@@ -727,22 +1057,24 @@ export default function PatientRecordPage() {
                  <p className="text-[10px] font-bold">Use a barra de pesquisa acima para encontrar um paciente.</p>
               </div>
            ) : (
-             <div className="flex flex-col gap-6 w-full items-center my-auto">
-                <div className="flex justify-center items-end gap-1.5 flex-nowrap">
-                   {upperJaw.map((n, i) => (
-                     <div key={n} className="flex items-end gap-1 shrink-0">
-                        <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                        {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
-                     </div>
-                   ))}
-                </div>
-                <div className="flex justify-center items-start gap-1.5 flex-nowrap">
-                   {lowerJaw.map((n, i) => (
-                     <div key={n} className="flex items-start gap-1 shrink-0">
-                        <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
-                        {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
-                     </div>
-                   ))}
+             <div className="flex w-full items-center justify-center relative px-12">
+                <div className="flex flex-col gap-6 items-center my-auto">
+                   <div className="flex justify-center items-end gap-1.5 flex-nowrap">
+                      {upperJaw.map((n, i) => (
+                        <div key={n} className="flex items-end gap-1 shrink-0">
+                           <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                           {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
+                        </div>
+                      ))}
+                   </div>
+                   <div className="flex justify-center items-start gap-1.5 flex-nowrap">
+                      {lowerJaw.map((n, i) => (
+                        <div key={n} className="flex items-start gap-1 shrink-0">
+                           <DetailedTooth number={n} status={patientOdontograms[selectedPatient?.id || ""]?.[n]?.status} surfaces={patientOdontograms[selectedPatient?.id || ""]?.[n]?.surfaces} onChange={updateTooth} onSelect={handleToothClick} isSelected={selectedTooth === n} />
+                           {i === 7 && <div className="w-px h-16 bg-slate-100 mx-3" />}
+                        </div>
+                      ))}
+                   </div>
                 </div>
              </div>
            )}
@@ -819,7 +1151,7 @@ export default function PatientRecordPage() {
         </div>
       </main>
 
-      {showLaunchModal && (
+            {showLaunchModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-0 animate-in fade-in duration-300">
           <div className="bg-slate-50 w-full h-full flex flex-col">
             <div className="px-8 py-3 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
@@ -827,113 +1159,147 @@ export default function PatientRecordPage() {
                  <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg">
                    <Plus size={16} />
                  </div>
-                 <h3 className="text-[12px] font-black uppercase text-slate-900">Novo Lançamento</h3>
+                 <h3 className="text-[12px] font-black uppercase text-slate-900">
+                   Novo Lançamento - {catalogData?.specialties?.find(s => s.id === expandedCategories[0])?.name || "Geral"}
+                 </h3>
                </div>
                <button onClick={() => setShowLaunchModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
             </div>
-            <div className="flex-1 overflow-hidden flex">
-               <div className="w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex gap-2">
-                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input type="text" placeholder="Buscar catálogo..." value={procedureSearchTerm} onChange={(e) => setProcedureSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none" />
-                     </div>
-                     {selectedTreatment && (
-                        <button onClick={() => { setSelectedTreatment(null); setSelectedTreatmentId(null); setTreatmentValue(""); setSelectedProcedures([]); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-all" title="Limpar seleção">
-                           <X size={16} />
-                        </button>
-                     )}
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                     {catalogData?.specialties?.map(specialty => {
-                        const procs = catalogData.procedures.filter(p => p.specialtyId === specialty.id && normalizeString(p.name).includes(normalizeString(procedureSearchTerm)));
-                        if (procs.length === 0) return null;
-                        
-                        const isExpanded = procedureSearchTerm.length > 0 || expandedCategories.includes(specialty.id);
-                        
-                        return (
-                           <div key={specialty.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-                              <button 
-                                onClick={() => setExpandedCategories(prev => prev.includes(specialty.id) ? prev.filter(id => id !== specialty.id) : [...prev, specialty.id])}
-                                className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                              >
-                                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{specialty.name}</p>
-                                <ChevronDown size={14} className={cn("text-slate-400 transition-transform", isExpanded ? "rotate-180" : "")} />
-                              </button>
-                              
-                              {isExpanded && (
-                                 <div className="p-2 space-y-1">
-                                    {procs.map(i => {
-                                       const isSelected = selectedProcedures.some(p => p.id === i.id);
-                                       return (
-                                          <button 
-                                             key={i.id} 
-                                             onClick={() => {
-                                                let newSelected;
-                                                if (isSelected) {
-                                                   newSelected = selectedProcedures.filter(p => p.id !== i.id);
-                                                } else {
-                                                   newSelected = [...selectedProcedures, i];
-                                                }
-                                                setSelectedProcedures(newSelected);
-                                                
-                                                // Update summary display
-                                                if (newSelected.length === 1) {
-                                                   setSelectedTreatment(newSelected[0].name);
-                                                   setSelectedTreatmentId(newSelected[0].id);
-                                                } else if (newSelected.length > 1) {
-                                                   setSelectedTreatment(newSelected.map(p => p.name).join(" + "));
-                                                   setSelectedTreatmentId("multiple");
-                                                } else {
-                                                   setSelectedTreatment(null);
-                                                   setSelectedTreatmentId(null);
-                                                }
-
-                                                // Update total value
-                                                const totalInCents = newSelected.reduce((acc, p) => acc + Math.round((parseFloat(p.price) || 0) * 100), 0);
-                                                setTreatmentValue(formatCurrencyInput(totalInCents.toString()));
-                                             }} 
-                                             className={cn("w-full text-left p-3 rounded-xl text-[10px] font-bold border transition-all", isSelected ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white border-slate-100 hover:bg-blue-50")}
-                                          >
-                                             <div className="flex justify-between items-center">
-                                                <span className="flex-1 mr-2">{i.name}</span>
-                                                <span className={cn("shrink-0 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase", isSelected ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500")}>
-                                                   {formatCurrencyInput(Math.round((i.price || 0) * 100).toString())}
-                                                </span>
-                                             </div>
-                                          </button>
-                                       );
-                                    })}
-                                 </div>
-                              )}
-                           </div>
-                        );
-                     })}
-                  </div>
-               </div>
-               <div className="flex-1 p-6 overflow-y-auto bg-slate-50">
-                  <div className="max-w-5xl mx-auto space-y-4">
+            <div className="flex-1 overflow-hidden flex justify-center bg-slate-50">
+               <div className="w-full p-8 overflow-y-auto custom-scrollbar">
+                  <div className="max-w-6xl mx-auto space-y-4">
                      
-                     <div className="grid grid-cols-4 gap-3">
-                        <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Data</label><input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" /></div>
-                        <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Horário</label><input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" /></div>
-                        <div className="space-y-1.5 col-span-2"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Status</label>
-                           <div className="flex bg-white rounded-xl border border-slate-300 p-1 h-[48px]">
-                              <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-900" : "text-slate-500 hover:bg-slate-50")}>Pendente</button>
-                              <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-50")}>Concluído</button>
+                     {/* LINHA 1: Data, Hora e Status */}
+                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
+                        <div className="grid grid-cols-3 gap-6">
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Data do Procedimento</label>
+                              <input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Horário</label>
+                              <input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Status</label>
+                              <div className="flex bg-slate-50 rounded-xl border border-slate-200 p-1 h-[48px]">
+                                 <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-900" : "text-slate-500 hover:bg-slate-100")}>PENDENTE</button>
+                                 <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-100")}>CONCLUÍDO</button>
+                              </div>
                            </div>
                         </div>
                      </div>
 
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-[24px] border border-slate-300 shadow-sm space-y-3">
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dente / Região</label>
-                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                     {/* LINHA 2: Dentista e Paciente */}
+                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
+                        <div className="grid grid-cols-2 gap-6">
+                           <div className="space-y-1.5 relative">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dentista Responsável</label>
+                              <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                 <p className="text-[14px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione o Dentista..."}</p>
+                                 <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isProfessionalExpanded ? "rotate-180" : "")} />
+                              </button>
+                              {isProfessionalExpanded && (
+                                 <div className="absolute top-[60px] left-0 right-0 z-[250] bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                    {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "text-slate-900 hover:bg-slate-100")}>{p.name}</button>)}
+                                 </div>
+                              )}
                            </div>
                            <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Nome do Paciente</label>
+                              <input type="text" value={selectedPatient?.name || ""} disabled className="w-full p-3 bg-blue-50 border border-blue-100 rounded-xl text-[14px] font-black text-blue-700 outline-none h-[48px]" />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* LINHA 3: Procedimento e Dente */}
+                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
+                        <div className="grid grid-cols-12 gap-6">
+                                                      <div className="col-span-8 space-y-1.5 relative">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Procedimento</label>
+                              <div className="relative group">
+                                 <div className="relative">
+                                    <input 
+                                       type="text"
+                                       placeholder="Pesquisar procedimento..."
+                                       value={selectedTreatment || procedureSearchTerm}
+                                       onChange={(e) => {
+                                          const val = e.target.value;
+                                          setProcedureSearchTerm(val);
+                                          if (selectedTreatment) {
+                                             setSelectedTreatment(null);
+                                             setSelectedTreatmentId(null);
+                                             setSelectedProcedures([]);
+                                             setTreatmentValue("");
+                                          }
+                                       }}
+                                       onFocus={() => { 
+                                          setIsProcedureSearchFocused(true);
+                                          if (!selectedTreatment) setProcedureSearchTerm(procedureSearchTerm || ""); 
+                                       }}
+                                       onBlur={() => setTimeout(() => setIsProcedureSearchFocused(false), 200)}
+                                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px] focus:border-blue-500 focus:bg-white transition-all pl-12"
+                                    />
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                    {(procedureSearchTerm || selectedTreatment) && (
+                                       <button 
+                                          onClick={() => {
+                                             setProcedureSearchTerm("");
+                                             setSelectedTreatment(null);
+                                             setSelectedTreatmentId(null);
+                                             setSelectedProcedures([]);
+                                             setTreatmentValue("");
+                                          }}
+                                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
+                                       >
+                                          <X size={18} />
+                                       </button>
+                                    )}
+                                 </div>
+
+                                 {/* Dropdown de Resultados */}
+                                 {(procedureSearchTerm || isProcedureSearchFocused) && !selectedTreatment && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[300] max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
+                                       {catalogData?.procedures
+                                          .filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm)))
+                                          .sort((a, b) => a.name.localeCompare(b.name))
+                                          .map(proc => (
+                                             <button 
+                                                key={proc.id} 
+                                                onClick={() => {
+                                                   setSelectedTreatment(proc.name);
+                                                   setSelectedTreatmentId(proc.id);
+                                                   setSelectedProcedures([proc]);
+                                                   setTreatmentValue(formatCurrencyInput(Math.round((proc.price || 0) * 100).toString()));
+                                                   setProcedureSearchTerm("");
+                                                }}
+                                                className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"
+                                             >
+                                                <span className="font-black text-[11px] uppercase text-slate-700">{proc.name}</span>
+                                                <span className="text-[10px] font-black text-blue-600 shrink-0">{formatCurrencyInput(Math.round((proc.price || 0) * 100).toString())}</span>
+                                             </button>
+                                          ))
+                                       }
+                                       {catalogData?.procedures.filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm))).length === 0 && (
+                                          <div className="p-4 text-center text-slate-400 text-[10px] font-black uppercase">Nenhum procedimento encontrado</div>
+                                       )}
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+                           <div className="col-span-4 space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dente / Região</label>
+                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px]" />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* LINHA 4: Observações e Faces */}
+                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
+                        <div className="grid grid-cols-12 gap-6">
+                           <div className="col-span-4 space-y-1.5">
                               <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Faces (Opcional)</label>
-                              <div className="flex gap-2">
+                              <div className="flex gap-1.5">
                                  {['top', 'bottom', 'left', 'right', 'center'].map((face) => {
                                     const labels: any = { top: 'V', bottom: 'L', left: 'D', right: 'M', center: 'O' };
                                     return (
@@ -942,60 +1308,50 @@ export default function PatientRecordPage() {
                                  })}
                               </div>
                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="space-y-1.5 relative">
-                               <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Profissional</label>
-                               <div className="bg-white border border-slate-300 rounded-xl">
-                                  <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
-                                    <p className="text-[13px] font-black text-slate-900 uppercase tracking-widest">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={18} className={cn("text-slate-600 transition-transform", isProfessionalExpanded ? "rotate-180" : "")} />
-                                  </button>
-                               </div>
-                               {isProfessionalExpanded && (
-                                  <div className="absolute top-[60px] left-0 right-0 z-50 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                     {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "text-slate-900 hover:bg-slate-100")}>{p.name}</button>)}
-                                  </div>
-                               )}
-                            </div>
-                            <div className="space-y-1.5 relative">
-                               <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Convênio</label>
-                               <div className="bg-white border border-slate-300 rounded-xl">
-                                  <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
-                                    <p className="text-[13px] font-black text-slate-900 uppercase tracking-widest">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Selecione..."}</p>
-                                    <ChevronDown size={18} className={cn("text-slate-600 transition-transform", isConvenioExpanded ? "rotate-180" : "")} />
-                                  </button>
-                               </div>
-                               {isConvenioExpanded && (
-                                  <div className="absolute top-[60px] left-0 right-0 z-50 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                     {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100")}>{c.name}</button>)}
-                                  </div>
-                               )}
-                            </div>
+                           <div className="col-span-8 space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Notas Técnicas / Observações</label>
+                              <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[14px] font-black text-slate-900 h-[48px] outline-none resize-none focus:bg-white focus:border-blue-300 transition-all placeholder:text-slate-300" />
+                           </div>
                         </div>
                      </div>
 
-                     <div className="bg-white p-4 rounded-[24px] border border-slate-300 shadow-sm space-y-4">
-                        <div className="grid grid-cols-4 gap-3">
-                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Pagamento</label>
-                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[13px] font-black text-slate-900 outline-none h-[48px]">
-                                 <option value="none">Sem Pagamento</option>
+                     {/* LINHA 5: Informações Bancárias / Financeiro */}
+                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm border-t-4 border-t-emerald-500">
+                        <div className="grid grid-cols-4 gap-6">
+                           <div className="space-y-1.5 relative">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Convênio</label>
+                              <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                 <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Particular"}</p>
+                                 <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isConvenioExpanded ? "rotate-180" : "")} />
+                              </button>
+                              {isConvenioExpanded && (
+                                 <div className="absolute bottom-full left-0 right-0 z-[250] mb-2 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                    {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100")}>{c.name}</button>)}
+                                 </div>
+                              )}
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Pagamento</label>
+                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
+                                 <option value="none">Método...</option>
                                  {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
                            </div>
-                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Recebimento</label>
-                              <div className="flex bg-slate-50 rounded-xl border border-slate-200 p-1 h-[48px]">
-                                 <button onClick={() => setIsPaid(false)} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", !isPaid ? "bg-rose-100 text-rose-900" : "text-slate-500 hover:bg-slate-100")}>Pendente</button>
-                                 <button onClick={() => setIsPaid(true)} className={cn("flex-1 text-[13px] font-black rounded-lg transition-colors", isPaid ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-100")}>Pago</button>
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Parcelas / Recebimento</label>
+                              <div className="flex gap-2">
+                                 <select value={installments} onChange={e => setInstallments(e.target.value)} className="w-20 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
+                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
+                                 </select>
+                                 <button onClick={() => setIsPaid(!isPaid)} className={cn("flex-1 px-2 text-[10px] font-black rounded-xl transition-all border", isPaid ? "bg-emerald-100 text-emerald-900 border-emerald-200" : "bg-rose-100 text-rose-900 border-rose-200")}>
+                                    {isPaid ? "PAGO" : "PENDENTE"}
+                                 </button>
                               </div>
                            </div>
-                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Parcelas</label><select value={installments} onChange={e => setInstallments(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[13px] font-black text-slate-900 outline-none h-[48px]">{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}</select></div>
-                           <div className="space-y-1.5"><label className="text-[13px] font-black text-slate-900 uppercase ml-1">Valor Final</label><input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[16px] font-black text-emerald-700 outline-none h-[48px]" /></div>
-                        </div>
-                        <div className="space-y-1.5">
-                           <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Notas Técnicas / Observações</label>
-                           <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-4 bg-slate-50 rounded-xl border border-slate-300 text-[14px] font-black text-slate-900 h-28 outline-none resize-none focus:bg-white focus:border-blue-300 transition-all placeholder:text-slate-300" />
+                           <div className="space-y-1.5">
+                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Valor Final</label>
+                              <input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[18px] font-black text-emerald-700 outline-none h-[48px]" />
+                           </div>
                         </div>
                      </div>
                   </div>
