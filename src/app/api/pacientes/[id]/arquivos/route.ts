@@ -29,8 +29,8 @@ export async function GET(
     const documentosFormatados = documentos.map(doc => ({
       ID: `DOC_${doc.id}`,
       NROPAC: id,
-      NOME: doc.nome || (doc.tipo === '1' ? 'Atestado' : 'Receituário'),
-      TIPO: doc.tipo === '1' ? 'atestado' : (doc.tipo === '2' ? 'receituario' : 'documento'),
+      NOME: doc.nome || (doc.tipo === '1' ? 'Atestado' : (doc.tipo === '2' ? 'Receituário' : 'Recibo')),
+      TIPO: doc.tipo === '1' ? 'atestado' : (doc.tipo === '2' ? 'receituario' : (doc.tipo === '3' ? 'recibo' : 'documento')),
       PATH: `db://LOG_DOCUMENTO/${doc.id}`,
       DATA_UPLOAD: doc.data,
       OBSERVACAO: "Gerado pelo sistema",

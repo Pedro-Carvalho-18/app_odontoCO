@@ -20,7 +20,8 @@ import {
   ArrowLeft,
   FolderOpen,
   Pill,
-  Image as ImageIcon
+  Image as ImageIcon,
+  DollarSign
 } from "lucide-react";
 import { cn, rtfToHtml } from "@/lib/utils";
 
@@ -209,6 +210,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
       const category = currentPath[0];
       if (category === 'atestados') return file.TIPO === 'atestado';
       if (category === 'receituarios') return file.TIPO === 'receituario';
+      if (category === 'recibos') return file.TIPO === 'recibo';
       if (category === 'radiografias') return file.TIPO === 'radiografia';
       if (category === 'tratamentos' && currentPath[1]) return String(file.NROINTPAC) === String(currentPath[1]);
     }
@@ -218,7 +220,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
   const getBreadcrumbs = () => {
     const crumbs: { name: string; path: string[] }[] = [{ name: 'Raiz', path: [] }];
     if (currentPath[0]) {
-      const catNames: any = { atestados: 'Atestados', receituarios: 'Receituários', radiografias: 'Radiografias', tratamentos: 'Tratamentos' };
+      const catNames: any = { atestados: 'Atestados', receituarios: 'Receituários', recibos: 'Recibos', radiografias: 'Radiografias', tratamentos: 'Tratamentos' };
       crumbs.push({ name: catNames[currentPath[0]], path: [currentPath[0]] });
     }
     if (currentPath[1]) {
@@ -231,8 +233,9 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
   const categories = [
     { id: 'atestados', name: 'Atestados', icon: FileBadge, color: 'bg-emerald-100 text-emerald-600', count: files.filter(f => f.TIPO === 'atestado').length },
     { id: 'receituarios', name: 'Receituários', icon: Pill, color: 'bg-rose-100 text-rose-600', count: files.filter(f => f.TIPO === 'receituario').length },
+    { id: 'recibos', name: 'Recibos', icon: DollarSign, color: 'bg-amber-100 text-amber-600', count: files.filter(f => f.TIPO === 'recibo').length },
     { id: 'radiografias', name: 'Radiografias', icon: ImageIcon, color: 'bg-blue-100 text-blue-600', count: files.filter(f => f.TIPO === 'radiografia').length },
-    { id: 'tratamentos', name: 'Tratamentos', icon: Folder, color: 'bg-amber-100 text-amber-600', count: interventions.length },
+    { id: 'tratamentos', name: 'Tratamentos', icon: Folder, color: 'bg-slate-100 text-slate-600', count: interventions.length },
   ];
 
   return (

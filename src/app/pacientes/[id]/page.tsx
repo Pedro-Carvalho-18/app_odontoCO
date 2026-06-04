@@ -24,7 +24,8 @@ import {
   Upload,
   Stethoscope,
   HeartPulse,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign
 } from "lucide-react";import { cn } from "@/lib/utils";
 import { useCallback, Suspense } from "react";
 import { FilesModal } from "@/components/FilesModal";
@@ -842,6 +843,16 @@ function PatientProfileContent() {
                               <div className="flex items-center gap-2 text-emerald-600 mb-1">
                                 <FileBadge size={18} className="shrink-0" />
                                 <span className="text-[11px] font-black uppercase tracking-widest">Atestado Gerado</span>
+                              </div>
+                              <p className="text-[15px] font-bold text-slate-700 leading-relaxed italic">
+                                {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}
+                              </p>
+                            </div>
+                          ) : item.procedure.includes("Recibo #") ? (
+                            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50 group-hover:border-amber-200 transition-all">
+                              <div className="flex items-center gap-2 text-amber-600 mb-1">
+                                <DollarSign size={18} className="shrink-0" />
+                                <span className="text-[11px] font-black uppercase tracking-widest">Recibo Gerado</span>
                               </div>
                               <p className="text-[15px] font-bold text-slate-700 leading-relaxed italic">
                                 {item.procedure.replace(/PROCEDIMENTO:\s*/i, "").trim()}

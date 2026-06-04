@@ -13,7 +13,8 @@ import {
   DollarSign, 
   Calendar,
   Loader2,
-  Trash2
+  Trash2,
+  History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -281,7 +282,7 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
                      <textarea 
                         value={finalText}
                         onChange={(e) => setFinalText(e.target.value)}
-                        className="w-full h-full resize-none outline-none font-serif text-[16px] leading-relaxed text-center"
+                        className="w-full h-full resize-none outline-none font-mono text-[14px] leading-relaxed text-center"
                         spellCheck="false"
                      />
                   </div>

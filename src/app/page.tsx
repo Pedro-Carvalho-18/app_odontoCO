@@ -43,6 +43,7 @@ import {
   Maximize,
   AlertCircle,
   FileBadge,
+  DollarSign,
   Microscope,
   Stethoscope,
   Scan,
@@ -216,6 +217,7 @@ export default function PatientRecordPage() {
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [showAtestadoModal, setShowAtestadoModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [initialFilesIntervention, setInitialFilesIntervention] = useState<string | undefined>(undefined);
   const [prescriptionText, setPrescriptionText] = useState("");
@@ -298,7 +300,7 @@ export default function PatientRecordPage() {
       icon: 'dia_auscoroa.bmp',
       items: [
         { name: 'Faltante', icon: 'dia_auscoroa.bmp' },
-        { name: 'Cárie', icon: 'int_carie.bmp' },
+        { name: 'Cárie', icon: 'dia_lesao.bmp' },
         { name: 'Aus. Coroa', icon: 'dia_auscoroa.bmp' },
         { name: 'Aus. Raiz', icon: 'dia_ausraiz.bmp' },
         { name: 'Impactado', icon: 'dia_impactado.bmp' },
@@ -812,7 +814,7 @@ export default function PatientRecordPage() {
         currentOdontogram[tNumInt].status = 'prosthesis';
       } else if (procLower.includes('carie')) {
         currentOdontogram[tNumInt].status = 'caries';
-        currentOdontogram[tNumInt].latestIcon = 'int_carie.bmp';
+        currentOdontogram[tNumInt].latestIcon = 'dia_lesao.bmp';
       }
 
       if (icon) {
@@ -988,7 +990,7 @@ export default function PatientRecordPage() {
               <div className="relative group">
                 <div className={cn(
                   "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-2 transition-all duration-500 overflow-hidden",
-                  isDiagExpanded ? "max-w-[500px]" : "max-w-[48px]"
+                  isDiagExpanded ? "max-w-[500px]" : "max-w-[52px]"
                 )}>
                   <button 
                     onClick={() => {
@@ -1000,12 +1002,12 @@ export default function PatientRecordPage() {
                       if (next) { setIsIntExpanded(false); setIsTreatmentsExpanded(false); }
                     }}
                     className={cn(
-                      "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                      "w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0",
                       isDiagExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
                     )}
                     title={isDiagExpanded ? "Fechar" : "Abrir Diagnóstico"}
                   >
-                    {isDiagExpanded ? <X size={20} /> : <Microscope size={20} />}
+                    {isDiagExpanded ? <X size={20} /> : <img src="/icones/app/esp_Diagnóstico.bmp" alt="Diagnóstico" className="w-7 h-7 object-contain" />}
                   </button>
 
                   {isDiagExpanded && (
@@ -1131,7 +1133,7 @@ export default function PatientRecordPage() {
               <div className="relative group">
                 <div className={cn(
                   "flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-sm ml-1 transition-all duration-500 overflow-hidden",
-                  isIntExpanded ? "max-w-[800px]" : "max-w-[48px]"
+                  isIntExpanded ? "max-w-[800px]" : "max-w-[52px]"
                 )}>
                   <button 
                     onClick={() => {
@@ -1143,12 +1145,12 @@ export default function PatientRecordPage() {
                       if (next) { setIsDiagExpanded(false); }
                     }}
                     className={cn(
-                      "p-2 rounded-xl transition-all flex items-center justify-center shrink-0",
+                      "w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0",
                       isIntExpanded ? "bg-rose-50 text-rose-500" : "hover:bg-white text-blue-600"
                     )}
                     title={isIntExpanded ? "Fechar" : "Abrir Plano de Tratamento"}
                   >
-                    {isIntExpanded ? <X size={20} /> : <Activity size={20} />}
+                    {isIntExpanded ? <X size={20} /> : <img src="/icones/app/esp_Gerais.bmp" alt="Plano de Tratamento" className="w-7 h-7 object-contain" />}
                   </button>
 
                   {isIntExpanded && (
@@ -1320,6 +1322,14 @@ export default function PatientRecordPage() {
                         >
                           <FileBadge size={18} className="text-slate-400 group-hover:text-emerald-500" />
                           <span className="text-[11px] font-black uppercase tracking-wider">Gerar Atestado</span>
+                        </button>
+
+                        <button 
+                          onClick={() => { setShowReceiptModal(true); setIsActionMenuOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl transition-all group"
+                        >
+                          <DollarSign size={18} className="text-slate-400 group-hover:text-rose-500" />
+                          <span className="text-[11px] font-black uppercase tracking-wider">Gerar Recibo</span>
                         </button>
 
                         {selectedPatient && (
@@ -2186,6 +2196,9 @@ export default function PatientRecordPage() {
 
       {selectedPatient && (
         <FilesModal isOpen={showFilesModal} onClose={() => setShowFilesModal(false)} patientId={selectedPatient.id} patientName={selectedPatient.name} interventions={history.filter(h => h.type === 'intervention')} initialSelectedIntervention={initialFilesIntervention} />
+      )}
+      {selectedPatient && (
+        <ReceiptModal isOpen={showReceiptModal} onClose={() => setShowReceiptModal(false)} patientId={selectedPatient.id} />
       )}
       <DetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} item={activeHistoryItem} />
     </div>
