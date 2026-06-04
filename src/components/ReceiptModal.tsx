@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   X, 
   Search, 
@@ -37,13 +37,7 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
   const [finalText, setFinalText] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && patientId) {
-      fetchData();
-    }
-  }, [isOpen, patientId]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/pacientes/${patientId}/recibos/dados`);
@@ -56,7 +50,13 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientId]);
+
+  useEffect(() => {
+    if (isOpen && patientId) {
+      fetchData();
+    }
+  }, [isOpen, patientId, fetchData]);
 
   const togglePayment = (id: string) => {
     setSelectedPayments(prev => 
