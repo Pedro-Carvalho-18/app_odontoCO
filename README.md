@@ -26,8 +26,8 @@ Oferecemos duas versões do instalador para atender à sua necessidade:
 
 #### 1. Versão Limpa (Recomendada para Produção)
 Esta versão acompanha um banco de dados 100% limpo, sem pacientes ou transações de teste, pronta para o uso real e diário na sua clínica.
+> **[✨ Baixar OdontOC (Versão Limpa) - v1.0.2 (Windows .exe)](dist/OdontOC_Distrib_Clean_v1.0.2.exe)**
 > **[✨ Baixar OdontOC (Versão Limpa) - v1.0.1 (Windows .exe)](dist/OdontOC_Distrib_Clean_v1.0.1.exe)**
-> **[✨ Baixar OdontOC (Versão Limpa) - v1.0.0 (Windows .exe)](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OondrOC_V1.0(BancoDefault)/OdontOC_Distrib_Clean.exe)**
 
 #### 2. Versão de Avaliação (Com Dados)
 Esta versão é preenchida com pacientes, agendamentos e orçamentos fictícios para que você possa explorar e testar todas as funcionalidades do sistema livremente antes de começar de verdade.
