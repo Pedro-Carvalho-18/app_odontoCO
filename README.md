@@ -47,13 +47,32 @@ Sempre estamos melhorando o OdontOC. Quando uma nova versão for lançada, você
 **Fique tranquilo:** Ao instalar uma atualização, **seus pacientes, orçamentos e agenda NUNCA serão apagados.** O sistema possui um motor inteligente de *Migração de Dados* que atualiza a estrutura mantendo tudo intacto.
 
 ### Versões Disponíveis:
+- 🟡 **v1.0.2 (Estável - Geração de Recibos & Otimizações)** - *Novo sistema de emissão de recibos, ícones clínicos corrigidos e otimizações de UI.* -> **[Baixar v1.0.2 (EXE)](dist/OdontOC_Distrib_Clean_v1.0.2.exe)**
 - 🔵 **v1.0.1 (Estável - Otimização 1080p & Melhorias Clínicas)** - *Ajustes de interface para alta resolução, melhorias no histórico e correção no receituário.* -> **[Baixar v1.0.1 (EXE)](dist/OdontOC_Distrib_Clean_v1.0.1.exe)**
 - 🟢 **v1.0.0 (Lançamento Oficial)** - *Sistema completo de gestão, prontuário e financeiro.* -> **[Baixar v1.0.0](https://github.com/Pedro-Carvalho-18/app_odontoCO/releases/download/OdontOC_V1.0/OdontOC_v1.0.0.exe)**
 
 **Como atualizar:**
 1. Feche o aplicativo OdontOC caso esteja aberto.
-2. Baixe o arquivo de Update acima (`OdontOC_Distrib_Clean_v1.0.1.exe`).
+2. Baixe o arquivo de Update acima (`OdontOC_Distrib_Clean_v1.0.2.exe`).
 3. Instale normalmente (ele substituirá apenas o motor do sistema, mantendo seu banco de dados seguro).
+
+---
+
+## 🚀 Novidades da v1.0.2
+
+- **Geração de Recibos:** 
+  - Novo módulo para emissão de recibos profissionais diretamente pelo prontuário do paciente.
+  - Histórico de recibos integrado à aba de "Arquivos" do paciente.
+  - Identificação visual clara (ícone de cifrão) na linha do tempo clínica.
+- **Correção de Ícones Clínicos:**
+  - O ícone de "Cárie" no odontograma agora utiliza corretamente o ícone de lesão (`dia_lesao.bmp`) em vez do ícone de intervenção.
+  - Substituição de ícones genéricos (Lupa/Atividade) por ícones clínicos específicos (`Diagnóstico` e `Gerais`) nos botões de expansão.
+- **Otimizações de UI:**
+  - Ajuste na largura dos menus laterais de diagnóstico para melhor visibilidade dos ícones.
+  - Melhorias no `ReceiptModal` para edição de texto em fonte monoespaçada, facilitando a visualização da formatação.
+- **Melhorias no Explorador de Arquivos:**
+  - Nova categoria "Recibos" adicionada ao gerenciador de arquivos do paciente.
+  - Cores de categorias atualizadas para melhor distinção visual.
 
 ---
 
