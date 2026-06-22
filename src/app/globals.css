@@ -67,3 +67,150 @@ body {
   }
 }
 
+/* ==========================================
+   Dark Theme (Preferências) Overrides
+   ========================================== */
+html.dark {
+  --background: #090d16;
+  --foreground: #f8fafc;
+}
+
+html.dark body {
+  background-color: #090d16 !important;
+  color: #f8fafc !important;
+}
+
+/* Background overrides */
+html.dark main .bg-white {
+  background-color: #131b2d !important;
+}
+
+html.dark main .bg-slate-50,
+html.dark main .bg-slate-100,
+html.dark main .bg-slate-50\/50,
+html.dark main .bg-slate-50\/80 {
+  background-color: #090d16 !important;
+}
+
+/* Text color overrides */
+html.dark main .text-slate-900,
+html.dark main .text-slate-800,
+html.dark main .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+html.dark main .text-slate-600,
+html.dark main .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark main .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Border overrides - much softer! */
+html.dark main .border-slate-100,
+html.dark main .border-slate-200,
+html.dark main .border-slate-300,
+html.dark main .divide-slate-50,
+html.dark main .divide-slate-100,
+html.dark main .divide-slate-200 {
+  border-color: #1e293b !important;
+  divide-color: #1e293b !important;
+}
+
+/* Hover states */
+html.dark main .hover\:bg-slate-50:hover,
+html.dark main .hover\:bg-slate-100:hover,
+html.dark main .hover\:bg-white:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark main .hover\:text-slate-900:hover,
+html.dark main .hover\:text-slate-800:hover {
+  color: #ffffff !important;
+}
+
+/* Custom settings cards */
+html.dark main .hover\:bg-white:hover {
+  background-color: #131b2d !important;
+}
+
+/* Form controls (inputs, selects, textareas) */
+html.dark main input,
+html.dark main select,
+html.dark main textarea {
+  background-color: #090d16 !important;
+  color: #f8fafc !important;
+  border-color: #1e293b !important;
+}
+
+html.dark main input::placeholder,
+html.dark main textarea::placeholder {
+  color: #475569 !important;
+}
+
+/* Custom scrollbars */
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b !important;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2d3d54 !important;
+}
+
+html.dark .custom-scrollbar-h::-webkit-scrollbar-thumb {
+  background: #1e293b !important;
+}
+html.dark .custom-scrollbar-h::-webkit-scrollbar-thumb:hover {
+  background: #2d3d54 !important;
+}
+
+/* Table headers & cells styling */
+html.dark main thead.bg-slate-50 {
+  background-color: #131b2d !important;
+}
+
+/* Modal and drop backdrop styling */
+html.dark .fixed.bg-slate-900\/60 {
+  background-color: rgba(9, 13, 22, 0.8) !important;
+}
+
+/* Special badges & highlighted backgrounds */
+html.dark main .bg-blue-50\/30 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+html.dark main .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  color: #60a5fa !important;
+}
+
+html.dark main .text-blue-700 {
+  color: #60a5fa !important;
+}
+
+html.dark main .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+
+html.dark main .text-emerald-600 {
+  color: #34d399 !important;
+}
+
+html.dark main .bg-rose-50\/50,
+html.dark main .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #f87171 !important;
+}
+
+html.dark main .text-rose-500 {
+  color: #f87171 !important;
+}
+
+/* Invert black-and-white dental icons and treatment drawings in dark mode for visibility and aesthetics */
+html.dark main img[src*="/icones/app/"] {
+  filter: invert(1) brightness(1.2) contrast(1.1) !important;
+}
+
+

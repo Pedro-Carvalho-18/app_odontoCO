@@ -745,8 +745,15 @@ function PatientProfileContent() {
                 <span className="text-[9px] font-black uppercase">Arquivos</span>
               </button>
               <button 
+                onClick={() => router.push(`/?patientId=${id}`)}
+                className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all text-blue-600"
+              >
+                <Stethoscope size={18} />
+                <span className="text-[9px] font-black uppercase">Odontograma</span>
+              </button>
+              <button 
                 onClick={() => router.push(`/?patientId=${id}&action=new_budget`)}
-                className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-600 col-span-2"
+                className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 transition-all text-emerald-600"
               >
                 <CreditCard size={18} />
                 <span className="text-[9px] font-black uppercase">Orçamento</span>

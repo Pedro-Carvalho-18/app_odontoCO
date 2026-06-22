@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const waitOn = require('wait-on');
@@ -12,6 +12,20 @@ if (!gotTheLock) {
 
 let nextProcess;
 let mainWindow;
+
+ipcMain.on('resize-window', (event, width, height) => {
+  console.log("resize-window received:", width, height);
+  if (mainWindow) {
+    const w = parseInt(width, 10);
+    const h = parseInt(height, 10);
+    if (!isNaN(w) && !isNaN(h)) {
+      mainWindow.setSize(w, h);
+      mainWindow.center();
+    } else {
+      console.error("Invalid window size parameters:", width, height);
+    }
+  }
+});
 
 function ensureDatabase() {
   const userDataPath = app.getPath('userData');
@@ -37,6 +51,17 @@ function ensureDatabase() {
   }
 
   return dbPath;
+}
+
+function ensureUploads() {
+  const userDataPath = app.getPath('userData');
+  const uploadDir = path.join(userDataPath, 'uploads');
+
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  return uploadDir;
 }
 
 function createWindow(port) {
@@ -65,6 +90,7 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 
 app.whenReady().then(() => {
   const dbPath = ensureDatabase();
+  const uploadDir = ensureUploads();
   
   const isDev = !app.isPackaged;
   
@@ -78,7 +104,7 @@ app.whenReady().then(() => {
     srv.listen(0, '127.0.0.1', () => {
       const port = srv.address().port;
       srv.close(() => {
-        startNextJs(standaloneDir, serverPath, dbPath, port);
+        startNextJs(standaloneDir, serverPath, dbPath, uploadDir, port);
       });
     });
     
@@ -92,7 +118,7 @@ app.whenReady().then(() => {
   }
 });
 
-function startNextJs(standaloneDir, serverPath, dbPath, port) {
+function startNextJs(standaloneDir, serverPath, dbPath, uploadDir, port) {
     const extraNodeModules = path.join(standaloneDir, 'next_modules');
     nextProcess = spawn(process.execPath, [serverPath], {
       env: { 
@@ -102,7 +128,8 @@ function startNextJs(standaloneDir, serverPath, dbPath, port) {
         PORT: port.toString(), 
         NODE_ENV: 'production',
         HOSTNAME: '127.0.0.1',
-        DATABASE_URL: dbPath
+        DATABASE_URL: dbPath,
+        UPLOAD_DIR: uploadDir
       },
       cwd: standaloneDir,
       detached: false,

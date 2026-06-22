@@ -5,7 +5,7 @@ import path from "path";
 
 export async function GET() {
   try {
-    const dbPath = path.join(process.cwd(), "database", "app_odonto.sqlite");
+    const dbPath = process.env.DATABASE_URL || path.join(process.cwd(), "database", "app_odonto.sqlite");
     
     if (!fs.existsSync(dbPath)) {
       return NextResponse.json({ error: "Banco de dados não encontrado" }, { status: 404 });

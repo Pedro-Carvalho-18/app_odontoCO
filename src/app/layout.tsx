@@ -19,6 +19,28 @@ function SystemHealth() {
   useEffect(() => {
     // Ao iniciar o app, chama o health check para garantir migrações do banco
     fetch("/api/health").catch(console.error);
+
+    // Carregar tema preferido
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // Carregar tamanho da tela preferido (se estiver no Electron)
+    const savedSize = localStorage.getItem('windowSize');
+    if (savedSize && typeof window !== 'undefined' && (window as any).require) {
+      try {
+        const [w, h] = savedSize.split('x').map(Number);
+        if (w && h) {
+          const electron = (window as any).require('electron');
+          electron.ipcRenderer.send('resize-window', w, h);
+        }
+      } catch (err) {
+        console.error("Erro ao aplicar tamanho de tela inicial:", err);
+      }
+    }
   }, []);
   return null;
 }

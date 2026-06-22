@@ -29,8 +29,8 @@ export async function GET(
     const documentosFormatados = documentos.map(doc => ({
       ID: `DOC_${doc.id}`,
       NROPAC: id,
-      NOME: doc.nome || (doc.tipo === '1' ? 'Atestado' : (doc.tipo === '2' ? 'Receituário' : 'Recibo')),
-      TIPO: doc.tipo === '1' ? 'atestado' : (doc.tipo === '2' ? 'receituario' : (doc.tipo === '3' ? 'recibo' : 'documento')),
+      NOME: doc.nome || (doc.tipo === '1' ? 'Atestado' : (doc.tipo === '2' ? 'Receituário' : (doc.tipo === '3' ? 'Recibo' : (doc.tipo === '5' ? 'Termo de Consentimento' : 'Documento')))),
+      TIPO: doc.tipo === '1' ? 'atestado' : (doc.tipo === '5' ? 'consentimento' : (doc.tipo === '2' ? 'receituario' : (doc.tipo === '3' ? 'recibo' : 'documento'))),
       PATH: `db://LOG_DOCUMENTO/${doc.id}`,
       DATA_UPLOAD: doc.data,
       OBSERVACAO: "Gerado pelo sistema",
@@ -67,7 +67,8 @@ export async function POST(
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "pacientes", nropac);
+    const baseUploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
+    const uploadDir = path.join(baseUploadDir, "pacientes", nropac);
     await mkdir(uploadDir, { recursive: true });
 
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;

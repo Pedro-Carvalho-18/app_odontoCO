@@ -98,6 +98,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
         if (currentPath[0] === 'atestados') tipo = 'atestado';
         if (currentPath[0] === 'receituarios') tipo = 'receituario';
         if (currentPath[0] === 'radiografias') tipo = 'radiografia';
+        if (currentPath[0] === 'consentimentos') tipo = 'consentimento';
         
         formData.append("tipo", tipo);
         
@@ -212,6 +213,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
       if (category === 'receituarios') return file.TIPO === 'receituario';
       if (category === 'recibos') return file.TIPO === 'recibo';
       if (category === 'radiografias') return file.TIPO === 'radiografia';
+      if (category === 'consentimentos') return file.TIPO === 'consentimento';
       if (category === 'tratamentos' && currentPath[1]) return String(file.NROINTPAC) === String(currentPath[1]);
     }
     return false;
@@ -220,7 +222,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
   const getBreadcrumbs = () => {
     const crumbs: { name: string; path: string[] }[] = [{ name: 'Raiz', path: [] }];
     if (currentPath[0]) {
-      const catNames: any = { atestados: 'Atestados', receituarios: 'Receituários', recibos: 'Recibos', radiografias: 'Radiografias', tratamentos: 'Tratamentos' };
+      const catNames: any = { atestados: 'Atestados', receituarios: 'Receituários', recibos: 'Recibos', radiografias: 'Radiografias', consentimentos: 'Consentimentos', tratamentos: 'Tratamentos' };
       crumbs.push({ name: catNames[currentPath[0]], path: [currentPath[0]] });
     }
     if (currentPath[1]) {
@@ -235,6 +237,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
     { id: 'receituarios', name: 'Receituários', icon: Pill, color: 'bg-rose-100 text-rose-600', count: files.filter(f => f.TIPO === 'receituario').length },
     { id: 'recibos', name: 'Recibos', icon: DollarSign, color: 'bg-amber-100 text-amber-600', count: files.filter(f => f.TIPO === 'recibo').length },
     { id: 'radiografias', name: 'Radiografias', icon: ImageIcon, color: 'bg-blue-100 text-blue-600', count: files.filter(f => f.TIPO === 'radiografia').length },
+    { id: 'consentimentos', name: 'Consentimentos', icon: FileText, color: 'bg-indigo-100 text-indigo-600', count: files.filter(f => f.TIPO === 'consentimento').length },
     { id: 'tratamentos', name: 'Tratamentos', icon: Folder, color: 'bg-slate-100 text-slate-600', count: interventions.length },
   ];
 
@@ -302,7 +305,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
             <div className="space-y-10">
               
               {currentLevel === 'root' && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                   {categories.map((cat) => (
                     <div 
                       key={cat.id}
@@ -384,7 +387,7 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
                                 win.document.close();
                             }
                           } else {
-                            window.open(file.PATH, '_blank');
+                            window.open(`/api/pacientes/${patientId}/arquivos/${file.ID}`, '_blank');
                           }
                         };
 
@@ -400,22 +403,18 @@ export function FilesModal({ isOpen, onClose, patientId, patientName, interventi
                             link.parentNode?.removeChild(link);
                             window.URL.revokeObjectURL(url);
                           } else {
-                            handleDownload(file.PATH, file.NOME);
+                            handleDownload(`/api/pacientes/${patientId}/arquivos/${file.ID}`, file.NOME);
                           }
                         };
 
                         return (
                           <div key={file.ID} className="group relative bg-white border border-slate-200 rounded-3xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-blue-300 flex flex-col">
-                            {/* Preview Area ... */}
-                            {/* (rest of the card UI remains same but uses handleOpen and handleDownloadForce) */}
-                            {/* I will only replace the relevant part in the tool call */}
-                            {/* Preview Area */}
                             <div 
                               onClick={handleOpen}
                               className="aspect-[4/3] bg-slate-50 flex items-center justify-center overflow-hidden relative cursor-pointer group/preview"
                             >
                               {isImage ? (
-                                <img src={file.PATH} alt={file.NOME} className="w-full h-full object-cover transition-transform duration-500 group-hover/preview:scale-110" />
+                                <img src={`/api/pacientes/${patientId}/arquivos/${file.ID}`} alt={file.NOME} className="w-full h-full object-cover transition-transform duration-500 group-hover/preview:scale-110" />
                               ) : (
                                 <div className="flex flex-col items-center gap-2">
                                   <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 group-hover/preview:scale-110 transition-transform">

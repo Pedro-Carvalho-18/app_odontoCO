@@ -26,7 +26,10 @@ import {
   Upload,
   AlertTriangle,
   Pill,
-  DollarSign
+  DollarSign,
+  Sun,
+  Moon,
+  Monitor
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +87,55 @@ export default function PerfilPage() {
   
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
   const [importErrorMessage, setImportErrorMessage] = useState("");
+
+  // Preferências do Sistema
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [windowSize, setWindowSize] = useState("1200x800");
+  const [isElectron, setIsElectron] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" || "light";
+      const savedSize = localStorage.getItem("windowSize") || "1200x800";
+      setTheme(savedTheme);
+      setWindowSize(savedSize);
+      setIsElectron(!!(window as any).require);
+    }
+  }, []);
+
+  const handleThemeChange = (newTheme: "light" | "dark") => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    window.dispatchEvent(new Event('theme-changed'));
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
+  };
+
+  const handleWindowSizeChange = (newSize: string) => {
+    setWindowSize(newSize);
+    localStorage.setItem("windowSize", newSize);
+    const [w, h] = newSize.split("x").map(Number);
+    if (w && h && typeof window !== "undefined") {
+      try {
+        const req = (window as any).require;
+        if (req) {
+          const electron = req("electron");
+          electron.ipcRenderer.send("resize-window", w, h);
+        } else {
+          console.warn("Electron native require is not available in this context.");
+        }
+      } catch (err) {
+        console.error("Erro ao redimensionar janela:", err);
+      }
+    }
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
+  };
 
   useEffect(() => {
     async function loadInitialData() {
@@ -321,6 +373,7 @@ export default function PerfilPage() {
   const menuItems = [
     { id: "perfil", label: "Meu Perfil", icon: User },
     { id: "clinica", label: "Dados da Clínica", icon: Building },
+    { id: "preferencias", label: "Preferências", icon: Settings },
     { id: "seguranca", label: "Segurança", icon: Shield },
     { id: "banco", label: "Banco de Dados", icon: Database },
   ];
@@ -625,7 +678,119 @@ export default function PerfilPage() {
             </div>
           )}
 
-          {activeTab !== "perfil" && activeTab !== "clinica" && activeTab !== "banco" && activeTab !== "seguranca" && (
+          {activeTab === "preferencias" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                    <Settings size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Preferências do Aplicativo</h2>
+                    <p className="text-sm text-slate-500">Personalize o tema visual e as dimensões da tela do sistema.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Tema Selection */}
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Tema do Aplicativo</h3>
+                      <p className="text-xs text-slate-500">Escolha o estilo visual para trabalhar de forma confortável.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Light Theme Card */}
+                      <button
+                        onClick={() => handleThemeChange("light")}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all duration-300 relative group overflow-hidden cursor-pointer",
+                          theme === "light"
+                            ? "bg-white border-blue-600 shadow-lg shadow-blue-100/50"
+                            : "bg-slate-50 border-slate-100 hover:border-slate-300 hover:bg-white"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors",
+                          theme === "light" ? "bg-amber-50 text-amber-500" : "bg-white text-slate-400 group-hover:text-amber-500"
+                        )}>
+                          <Sun size={24} />
+                        </div>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-900">Tema Claro</span>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Interface padrão do sistema</p>
+                      </button>
+
+                      {/* Dark Theme Card */}
+                      <button
+                        onClick={() => handleThemeChange("dark")}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all duration-300 relative group overflow-hidden cursor-pointer",
+                          theme === "dark"
+                            ? "bg-slate-900 border-indigo-500 text-white shadow-lg shadow-indigo-950/20"
+                            : "bg-slate-50 border-slate-100 hover:border-slate-300 hover:bg-white"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors",
+                          theme === "dark" ? "bg-indigo-950 text-indigo-400" : "bg-white text-slate-400 group-hover:text-indigo-400"
+                        )}>
+                          <Moon size={24} />
+                        </div>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-900">Tema Escuro</span>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ideal para ambientes com pouca luz</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  <hr className="border-slate-100" />
+
+                  {/* Window Size Selection */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Tamanho da Tela</h3>
+                        <p className="text-xs text-slate-500">Defina o tamanho preferido da janela do aplicativo (exclusivo para desktop).</p>
+                      </div>
+                      {!isElectron && (
+                        <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-black uppercase tracking-widest self-start sm:self-center border border-amber-100 animate-pulse">
+                          Disponível apenas no Desktop
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { size: "1024x768", label: "Compacto", desc: "1024 x 768" },
+                        { size: "1200x800", label: "Padrão", desc: "1200 x 800" },
+                        { size: "1440x900", label: "Médio", desc: "1440 x 900" },
+                        { size: "1920x1080", label: "Full HD", desc: "1920 x 1080" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.size}
+                          onClick={() => handleWindowSizeChange(preset.size)}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer",
+                            windowSize === preset.size
+                              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100"
+                              : "bg-slate-50 border-slate-100 hover:border-slate-300 text-slate-600 hover:bg-white"
+                          )}
+                        >
+                          <Monitor size={18} className="mb-2" />
+                          <span className="text-[10px] font-black uppercase tracking-widest leading-none">{preset.label}</span>
+                          <span className={cn(
+                            "text-[9px] font-bold mt-1 opacity-70",
+                            windowSize === preset.size ? "text-white" : "text-slate-400"
+                          )}>{preset.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab !== "perfil" && activeTab !== "clinica" && activeTab !== "banco" && activeTab !== "seguranca" && activeTab !== "preferencias" && (
             <div className="bg-white rounded-[40px] border border-slate-200 p-12 shadow-sm flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
                 <Settings size={32} />

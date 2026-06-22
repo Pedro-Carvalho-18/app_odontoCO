@@ -251,6 +251,16 @@ export default function PatientRecordPage() {
     usaHorario: true
   });
   const [finalAtestadoText, setFinalAtestadoText] = useState("");
+
+  // States for Consent Form (Termo de Consentimento) Workflow
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentStep, setConsentStep] = useState<'assistant' | 'editor'>('assistant');
+  const [consentForm, setConsentForm] = useState({
+    professionalId: "1",
+    procedureDescription: "",
+    observacoes: "",
+  });
+  const [finalConsentText, setFinalConsentText] = useState("");
   const [medicationsDB, setMedicationsDB] = useState<{ 
     code: number; 
     name: string;
@@ -1325,6 +1335,14 @@ export default function PatientRecordPage() {
                         </button>
 
                         <button 
+                          onClick={() => { setShowConsentModal(true); setIsActionMenuOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-xl transition-all group"
+                        >
+                          <ShieldCheck size={18} className="text-slate-400 group-hover:text-indigo-500" />
+                          <span className="text-[11px] font-black uppercase tracking-wider">Termo de Consentimento</span>
+                        </button>
+
+                        <button 
                           onClick={() => { setShowReceiptModal(true); setIsActionMenuOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl transition-all group"
                         >
@@ -2183,6 +2201,182 @@ export default function PatientRecordPage() {
                         } catch (err) {
                            console.error(err);
                            alert("Erro ao salvar arquivo do atestado.");
+                        }
+                     }} className="px-10 py-4 rounded-2xl font-black text-[10px] uppercase bg-emerald-600 text-white shadow-lg hover:bg-emerald-700">
+                        Gravar no Prontuário
+                     </button>
+                  </div>
+               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showConsentModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-0 animate-in fade-in duration-300">
+          <div className="bg-slate-50 w-full h-full flex flex-col">
+            <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 text-white rounded-xl"><ShieldCheck size={20} /></div>
+                  <h3 className="text-sm font-black uppercase">
+                     {consentStep === 'assistant' ? 'Assistente de Termos de Consentimento' : 'Editor de Termos'}
+                  </h3>
+               </div>
+               <button onClick={() => setShowConsentModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
+            </div>
+            
+            {consentStep === 'assistant' && (
+               <div className="flex-1 overflow-hidden flex items-center justify-center bg-slate-100 p-8">
+                  <div className="w-full max-w-2xl bg-white shadow-xl rounded-[32px] overflow-hidden flex flex-col border border-slate-200">
+                     <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cirurgião</label>
+                           <select 
+                              value={consentForm.professionalId} 
+                              onChange={(e) => setConsentForm({...consentForm, professionalId: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                           >
+                              {catalogData?.professionals?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                           </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paciente</label>
+                           <input type="text" value={selectedPatient?.name || ""} disabled className="w-full p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-black outline-none" />
+                        </div>
+
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tratamento / Procedimento</label>
+                           <input 
+                              type="text" 
+                              value={consentForm.procedureDescription} 
+                              onChange={(e) => setConsentForm({...consentForm, procedureDescription: e.target.value})}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 focus:bg-white transition-all h-[48px]"
+                              placeholder="Ex: Implante dentário no dente 14"
+                           />
+                        </div>
+
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observações Adicionais</label>
+                           <textarea 
+                              value={consentForm.observacoes} 
+                              onChange={(e) => setConsentForm({...consentForm, observacoes: e.target.value})}
+                              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none h-24 resize-none focus:bg-white transition-all"
+                              placeholder="Alguma observação específica para este termo?"
+                           />
+                        </div>
+                     </div>
+                     <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 shrink-0">
+                        <button onClick={() => setShowConsentModal(false)} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Cancelar</button>
+                        <button onClick={() => {
+                           const professional = catalogData?.professionals?.find(p => p.id === consentForm.professionalId);
+                           const profName = professional?.name || "Profissional";
+                           const profCro = professional?.cro || "";
+                           const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+                           
+                           let docText = `Consultório Odontológico\nAl. Rogério Pinto Ferráz 257\n14802-362 - Araraquara - SP\n\n\n`;
+                           docText += `TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO (TCLE)\n\n\n`;
+                           docText += `Eu, ${selectedPatient?.name || "[Nome do Paciente]"}, declaro que fui devidamente informado(a) pelo(a) cirurgião(ã)-dentista ${profName} sobre os detalhes do tratamento de "${consentForm.procedureDescription || "[Nome do Procedimento]"}".\n\n`;
+                           docText += `Fui esclarecido(a) quanto aos objetivos, riscos, benefícios, alternativas de tratamento e possíveis complicações decorrentes do procedimento proposto. Compreendo que na odontologia, como em qualquer ciência biológica, os resultados não são absolutamente garantidos e dependem também da resposta do meu organismo e dos cuidados pós-operatórios recomendados.\n\n`;
+                           docText += `Tive a oportunidade de fazer perguntas, as quais foram respondidas de forma satisfatória e em linguagem compreensível. Declaro estar ciente e de acordo com o plano de tratamento proposto.\n\n`;
+                           
+                           if (consentForm.observacoes) {
+                              docText += `Observações Adicionais: ${consentForm.observacoes}\n\n`;
+                           }
+
+                           docText += `\nAraraquara, ${today}\n\n\n`;
+                           docText += `___________________________________\n`;
+                           docText += `${selectedPatient?.name || "Paciente"}\n`;
+                           docText += `Paciente / Responsável\n\n\n`;
+                           docText += `___________________________________\n`;
+                           docText += `${profName}\n`;
+                           if (profCro) docText += `CRO ${profCro}\n`;
+                           docText += `Cirurgião-Dentista`;
+                           
+                           setFinalConsentText(docText);
+                           setConsentStep('editor');
+                        }} className="px-10 py-3 rounded-2xl font-black text-[10px] uppercase bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all">Gerar Termo</button>
+                     </div>
+                  </div>
+               </div>
+            )}
+
+            {consentStep === 'editor' && (
+               <div className="flex-1 overflow-hidden flex flex-col bg-slate-200 p-8 items-center">
+                  <div className="w-full max-w-4xl bg-white shadow-2xl flex-1 rounded-sm border border-slate-300 flex flex-col overflow-hidden">
+                     <div className="h-12 bg-slate-100 border-b border-slate-300 flex items-center px-4 gap-4 text-xs font-bold text-slate-600">
+                        <div className="flex gap-2">
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Arquivo</button>
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Editar</button>
+                           <button className="px-3 py-1 hover:bg-slate-200 rounded">Formatar</button>
+                        </div>
+                        <div className="w-px h-6 bg-slate-300" />
+                        <div className="flex gap-2 items-center">
+                           <span className="font-serif">Times New Roman</span>
+                           <span className="font-serif">12</span>
+                           <div className="w-4 h-4 bg-black rounded-sm" />
+                        </div>
+                     </div>
+                     <div className="flex-1 p-20 overflow-y-auto bg-white">
+                        <textarea 
+                           value={finalConsentText}
+                           onChange={(e) => setFinalConsentText(e.target.value)}
+                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center"
+                           spellCheck="false"
+                        />
+                     </div>
+                  </div>
+               </div>
+            )}
+
+            {consentStep === 'editor' && (
+               <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between shadow-2xl">
+                  <button onClick={() => setConsentStep('assistant')} className="px-6 py-4 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Voltar ao Assistente</button>
+                  <div className="flex gap-4">
+                     <button onClick={() => {
+                        window.print();
+                     }} className="px-8 py-4 rounded-2xl font-black text-[10px] uppercase bg-slate-800 text-white shadow-lg flex items-center gap-2 hover:bg-slate-900">
+                        <Printer size={16} /> Imprimir
+                     </button>
+                     <button onClick={async () => {
+                        if (!selectedPatient || !finalConsentText) return;
+                        
+                        try {
+                           const res = await fetch(`/api/pacientes/${selectedPatient.id}/salvar-termo`, { 
+                              method: 'POST', 
+                              headers: { 'Content-Type': 'application/json' }, 
+                              body: JSON.stringify({ text: finalConsentText }) 
+                           });
+                           if (!res.ok) throw new Error("Falha ao salvar arquivo");
+                           
+                           const resumo = `Termo de Consentimento: ${consentForm.procedureDescription || "Tratamento"}`;
+
+                           const newItem = { 
+                              id: Date.now(), 
+                              type: 'history', 
+                              date: new Date().toISOString(), 
+                              procedure: resumo, 
+                              status: "Concluído", 
+                              professional: catalogData?.professionals?.find(p => p.id === consentForm.professionalId)?.name || "Sistema", 
+                              value: "R$ 0,00", 
+                              numericValue: 0, 
+                              notes: "Termo de consentimento gerado e salvo como arquivo." 
+                           };
+                           
+                           await fetch(`/api/pacientes/${selectedPatient.id}/salvar`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ interventions: [newItem], odontogram: patientOdontograms[selectedPatient.id] || {} })
+                           });
+
+                           await fetchHistory(selectedPatient.id);
+                           
+                           alert("Termo de Consentimento gravado no prontuário e arquivo salvo com sucesso!");
+                           setShowConsentModal(false);
+                           setConsentStep('assistant');
+                        } catch (err) {
+                           console.error(err);
+                           alert("Erro ao salvar arquivo do termo.");
                         }
                      }} className="px-10 py-4 rounded-2xl font-black text-[10px] uppercase bg-emerald-600 text-white shadow-lg hover:bg-emerald-700">
                         Gravar no Prontuário

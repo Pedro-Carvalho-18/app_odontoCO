@@ -19,8 +19,9 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const dbPath = path.join(process.cwd(), "database", "app_odonto.sqlite");
-    const backupPath = path.join(process.cwd(), "database", `app_odonto_old_${Date.now()}.sqlite`);
+    const dbPath = process.env.DATABASE_URL || path.join(process.cwd(), "database", "app_odonto.sqlite");
+    const dbDir = path.dirname(dbPath);
+    const backupPath = path.join(dbDir, `app_odonto_old_${Date.now()}.sqlite`);
 
     // Fazer um backup do atual antes de sobrescrever, por segurança
     if (fs.existsSync(dbPath)) {
