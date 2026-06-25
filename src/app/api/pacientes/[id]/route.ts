@@ -45,6 +45,7 @@ export async function GET(
     // 2. Buscar anamnese (Saúde e Medicamentos)
     const anamnesis = await db.all(
       `SELECT 
+        QI.ID_QST_ITEM as id,
         Q.TX_PERGUNTA as question,
         RI.TX_COMPLEMENTO as complement,
         QI.TX_MSG_ALERTA as alert,

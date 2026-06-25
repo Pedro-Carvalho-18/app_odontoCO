@@ -20,6 +20,8 @@ export async function GET(request: Request) {
         C.DATA as date,
         C.HISTORICO as description,
         C.VALOR as value,
+        C.NROPAC as nroPac,
+        C.NROTRA as nroTra,
         P.PRINOM as patientName,
         TP.NOME as paymentMethod,
         'income' as type

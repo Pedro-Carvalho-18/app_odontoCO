@@ -83,10 +83,10 @@ export function DetailedTooth({
         className={cn(
           "relative w-[50px] h-[64px] flex items-center justify-center border transition-all p-1.5 cursor-pointer rounded-[12px] shadow-sm",
           isSelected ? "ring-2 ring-blue-500 ring-offset-1 z-20 scale-105" : "",
-          safeStatus === "healthy" ? "bg-white border-slate-200" :
-          safeStatus === "caries" ? "bg-rose-50 border-rose-200" :
-          safeStatus === "restoration" ? "bg-blue-50 border-blue-200" :
-          safeStatus === "prosthesis" ? "bg-amber-50 border-amber-200" :
+          safeStatus === "healthy" ? "bg-[#ffffff] border-slate-300" :
+          safeStatus === "caries" ? "bg-rose-50 border-rose-300" :
+          safeStatus === "restoration" ? "bg-blue-50 border-blue-300" :
+          safeStatus === "prosthesis" ? "bg-amber-50 border-amber-300" :
           "bg-slate-100 border-slate-300"
         )}
         onClick={cycleStatus}
@@ -120,7 +120,7 @@ export function DetailedTooth({
       </div>
 
       {/* Professional Surface Selector (Odontogram Envelope) */}
-      <div className="mt-1 relative w-[36px] h-[36px] rounded-sm overflow-hidden bg-white border border-slate-300 shadow-sm shrink-0">
+      <div className="mt-1 relative w-[36px] h-[36px] rounded-sm overflow-hidden bg-[#ffffff] border border-slate-300 shadow-sm shrink-0">
         <div 
           className={cn("absolute inset-0 transition-colors cursor-pointer", safeSurfaces.top ? "bg-blue-500" : "bg-slate-100 hover:bg-slate-200")}
           style={{ clipPath: "polygon(0 0, 100% 0, 70% 30%, 30% 30%)" }}

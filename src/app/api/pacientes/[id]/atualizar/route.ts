@@ -58,27 +58,60 @@ export async function POST(
       ]
     );
 
-    // 2. Atualizar Anamnese (Saúde)
+    // 2. Atualizar/Inserir Anamnese (Saúde)
     if (body.anamnesis && Array.isArray(body.anamnesis)) {
-      for (const item of body.anamnesis) {
+      // 2a. Garantir que existe o cabeçalho de resposta ANAMNESE_RSP para este paciente com ID_QST = '1'
+      let rsp = await db.get(
+        `SELECT ID_RSP FROM ANAMNESE_RSP WHERE ID_PESSOA = ? AND ID_QST = '1'`,
+        [id]
+      );
+      let rspId: string;
+      if (!rsp) {
+        const maxRsp = await db.get(`SELECT MAX(CAST(ID_RSP AS INTEGER)) as maxId FROM ANAMNESE_RSP`);
+        const nextRspId = (maxRsp?.maxId || 0) + 1;
+        rspId = String(nextRspId);
+        
         await db.run(
-          `UPDATE ANAMNESE_RSP_ITEM SET 
-            TX_COMPLEMENTO = ?,
-            ID_OPCAO_RSP = ?
-          WHERE ID_RSP_ITEM IN (
-            SELECT RI.ID_RSP_ITEM 
-            FROM ANAMNESE_RSP_ITEM RI
-            JOIN ANAMNESE_RSP R ON RI.ID_RSP = R.ID_RSP
-            JOIN ANAMNESE_QST_ITEM QI ON RI.ID_QST_ITEM = QI.ID_QST_ITEM
-            WHERE R.ID_PESSOA = ? AND QI.TX_PERGUNTA = ?
-          )`,
-          [
-            item.complement || item.alert || "", 
-            item.responseId || "0",
-            id, 
-            item.question
-          ]
+          `INSERT INTO ANAMNESE_RSP (ID_RSP, DT_RSP, ID_QST, ID_PESSOA, FL_CANCELADO, DT_TIME_STAMP_INS, ID_USER_STAMP_INS)
+           VALUES (?, datetime('now', 'localtime'), '1', ?, '0', datetime('now', 'localtime'), '1')`,
+          [rspId, id]
         );
+      } else {
+        rspId = rsp.ID_RSP;
+      }
+
+      // 2b. Para cada questão, atualizar ou inserir no ANAMNESE_RSP_ITEM
+      for (const item of body.anamnesis) {
+        if (item.id) {
+          const qstItemId = String(item.id);
+          const existingItem = await db.get(
+            `SELECT ID_RSP_ITEM FROM ANAMNESE_RSP_ITEM WHERE ID_RSP = ? AND ID_QST_ITEM = ?`,
+            [rspId, qstItemId]
+          );
+          const valComplement = item.complement || "";
+          const valResponseId = item.responseId || "0";
+          
+          if (existingItem) {
+            await db.run(
+              `UPDATE ANAMNESE_RSP_ITEM SET 
+                TX_COMPLEMENTO = ?,
+                ID_OPCAO_RSP = ?,
+                DT_TIME_STAMP_UPD = datetime('now', 'localtime'),
+                ID_USER_STAMP_UPD = '1'
+               WHERE ID_RSP_ITEM = ?`,
+              [valComplement, valResponseId, existingItem.ID_RSP_ITEM]
+            );
+          } else {
+            const maxItem = await db.get(`SELECT MAX(CAST(ID_RSP_ITEM AS INTEGER)) as maxId FROM ANAMNESE_RSP_ITEM`);
+            const nextItemId = (maxItem?.maxId || 0) + 1;
+            
+            await db.run(
+              `INSERT INTO ANAMNESE_RSP_ITEM (ID_RSP_ITEM, ID_RSP, ID_QST_ITEM, ID_OPCAO_RSP, TX_COMPLEMENTO, FL_CANCELADO, DT_TIME_STAMP_INS, ID_USER_STAMP_INS)
+               VALUES (?, ?, ?, ?, ?, '0', datetime('now', 'localtime'), '1')`,
+              [String(nextItemId), rspId, qstItemId, valResponseId, valComplement]
+            );
+          }
+        }
       }
     }
 

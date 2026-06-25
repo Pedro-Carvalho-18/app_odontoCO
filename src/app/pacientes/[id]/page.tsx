@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -25,9 +25,12 @@ import {
   Stethoscope,
   HeartPulse,
   AlertTriangle,
-  DollarSign
-} from "lucide-react";import { cn } from "@/lib/utils";
-import { useCallback, Suspense } from "react";
+  DollarSign,
+  Check,
+  X,
+  Edit2
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FilesModal } from "@/components/FilesModal";
 
 interface TreatmentItem {
@@ -66,6 +69,7 @@ function PatientProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "dados";
+  const initialNroTra = searchParams.get("nroTra") || null;
 
   const [patient, setPatient] = useState<any>(null);
   const [history, setHistory] = useState<{ history: TreatmentItem[], interventions: TreatmentItem[] } | null>(null);
@@ -77,10 +81,26 @@ function PatientProfileContent() {
   const [editForm, setEditForm] = useState<Partial<TreatmentItem>>({});
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPatientDeleteConfirm, setShowPatientDeleteConfirm] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [initialFilesIntervention, setInitialFilesIntervention] = useState<string | undefined>(undefined);
   const [isEditingPatient, setIsEditingPatient] = useState(false);
   const [patientEditForm, setPatientEditForm] = useState<any>({});
+  const [editingValueId, setEditingValueId] = useState<string | null>(null);
+  const [editingValueText, setEditingValueText] = useState<string>("");
+  const [highlightedTra, setHighlightedTra] = useState<string | null>(null);
+
+  // Calculate summary values from interventions in the history object
+  const totalValue = history?.interventions?.reduce((sum, inter) => sum + (Number(inter.value) || 0), 0) || 0;
+  
+  const totalPaid = history?.interventions?.reduce((sum, inter) => {
+    const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+    const paidInst = Number(inter.paidInstallments || 0);
+    const valPerInst = (Number(inter.value) || 0) / totalInst;
+    return sum + (paidInst * valPerInst);
+  }, 0) || 0;
+
+  const balance = Math.max(0, totalValue - totalPaid);
 
   const maritalStatuses = [
     { id: "1", name: "Casado(a)" },
@@ -160,7 +180,7 @@ function PatientProfileContent() {
 
       // Merge existing anamnesis from DB with our default list to ensure all questions are shown
       const mergedAnamnesis = defaultAnamnesis.map(dq => {
-        const existing = pData.anamnesis?.find((ea: any) => ea.question === dq.question);
+        const existing = pData.anamnesis?.find((ea: any) => String(ea.id) === String(dq.id));
         return existing ? { ...dq, ...existing } : dq;
       });
 
@@ -169,8 +189,8 @@ function PatientProfileContent() {
         anamnesis: mergedAnamnesis
       };
 
-      setPatient(patientWithAnamnesis);
-      setPatientEditForm(patientWithAnamnesis);
+      setPatient(JSON.parse(JSON.stringify(patientWithAnamnesis)));
+      setPatientEditForm(JSON.parse(JSON.stringify(patientWithAnamnesis)));
       setHistory(hData);
     } catch (err) {
       console.error(err);
@@ -179,9 +199,89 @@ function PatientProfileContent() {
     }
   }
 
+  const patientEditFormRef = useRef(patientEditForm);
+  const patientRef = useRef(patient);
+  
+  useEffect(() => {
+    patientEditFormRef.current = patientEditForm;
+  }, [patientEditForm]);
+  
+  useEffect(() => {
+    patientRef.current = patient;
+  }, [patient]);
+
+  const saveIfChanged = useCallback(async (currentForm: any) => {
+    if (!currentForm || !id) return;
+    const originalPatient = patientRef.current;
+    if (originalPatient && JSON.stringify(originalPatient) !== JSON.stringify(currentForm)) {
+      setSaving(true);
+      try {
+        const res = await fetch(`/api/pacientes/${id}/atualizar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentForm)
+        });
+        if (res.ok) {
+          await loadData();
+        }
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+      } finally {
+        setSaving(false);
+      }
+    }
+  }, [id]);
+
+  // Debounced auto-save (1.5 seconds)
+  useEffect(() => {
+    if (!patientEditForm || Object.keys(patientEditForm).length === 0) return;
+    const delayDebounceFn = setTimeout(() => {
+      saveIfChanged(patientEditForm);
+    }, 1500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [patientEditForm, saveIfChanged]);
+
+  // Auto-save on page leave or tab close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const currentForm = patientEditFormRef.current;
+      const originalPatient = patientRef.current;
+      if (currentForm && originalPatient && JSON.stringify(originalPatient) !== JSON.stringify(currentForm)) {
+        fetch(`/api/pacientes/${id}/atualizar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentForm),
+          keepalive: true
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, [id]);
+
   useEffect(() => {
     loadData();
   }, [id]);
+
+  // Scroll to and highlight the treatment row when coming from the finance page
+  useEffect(() => {
+    if (!initialNroTra || !history) return;
+    setHighlightedTra(initialNroTra);
+    // Wait for the DOM to paint with the finance tab active
+    setTimeout(() => {
+      const el = document.querySelector(`[data-nrotra="${initialNroTra}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      // Remove highlight after 3 seconds
+      setTimeout(() => setHighlightedTra(null), 3000);
+    }, 400);
+  }, [initialNroTra, history]);
 
   const maskCPF = (value: string) => {
     return value
@@ -246,6 +346,34 @@ function PatientProfileContent() {
     }
   };
 
+  const handleSaveValue = async (inter: TreatmentItem) => {
+    const parsedVal = parseFloat(editingValueText.replace(",", "."));
+    if (isNaN(parsedVal)) return;
+
+    setSaving(true);
+    try {
+      const totalInst = Number(inter.totalInstallments || inter.installments || 1);
+      const paidInst = Number(inter.paidInstallments || 0);
+
+      await fetch(`/api/pacientes/${id}/historico/atualizar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...inter,
+          value: parsedVal,
+          totalInstallments: totalInst,
+          paidInstallments: paidInst,
+        }),
+      });
+      setEditingValueId(null);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleEditClick = () => {
     setEditForm({ ...selectedItem });
     setIsEditing(true);
@@ -293,6 +421,25 @@ function PatientProfileContent() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePatient = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pacientes/${id}/excluir`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        router.push('/');
+      } else {
+        alert("Erro ao excluir paciente.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao excluir paciente.");
     } finally {
       setSaving(false);
     }
@@ -680,6 +827,7 @@ function PatientProfileContent() {
               className="font-bold text-slate-900 text-center bg-transparent border-none focus:ring-0 w-full resize-none h-auto py-0 leading-tight"
               value={patientEditForm?.name || ""}
               onChange={(e) => setPatientEditForm({ ...patientEditForm, name: e.target.value })}
+              onBlur={() => saveIfChanged(patientEditForm)}
             />
 
             <div className="w-full mt-8 space-y-4">
@@ -694,6 +842,7 @@ function PatientProfileContent() {
                     className="text-xs font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 w-full"
                     value={patientEditForm?.phone || ""}
                     onChange={(e) => setPatientEditForm({ ...patientEditForm, phone: e.target.value })}
+                    onBlur={() => saveIfChanged(patientEditForm)}
                   />
                 </div>
               </div>
@@ -708,23 +857,46 @@ function PatientProfileContent() {
                     className="text-xs font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 w-full truncate"
                     value={patientEditForm?.email || ""}
                     onChange={(e) => setPatientEditForm({ ...patientEditForm, email: e.target.value })}
+                    onBlur={() => saveIfChanged(patientEditForm)}
                   />
                 </div>
               </div>
             </div>
 
-            <button 
-              disabled={!hasChanges || saving}
-              onClick={handleSavePatient}
-              className={cn(
-                "w-full mt-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2",
-                hasChanges 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
-              )}
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : "Salvar Alterações"}
-            </button>
+            <div className="mt-8 flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl">
+              <div className="flex items-center gap-2 text-slate-500">
+                {saving ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-blue-600 shrink-0" />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">Salvando...</span>
+                  </>
+                ) : hasChanges ? (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-600">Pendente</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Salvo</span>
+                  </>
+                )}
+              </div>
+              
+              <button 
+                type="button"
+                onClick={handleSavePatient}
+                disabled={!hasChanges || saving}
+                className={cn(
+                  "px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all",
+                  hasChanges 
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 cursor-pointer" 
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                Salvar Agora
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
@@ -759,6 +931,42 @@ function PatientProfileContent() {
                 <span className="text-[9px] font-black uppercase">Orçamento</span>
               </button>
             </div>
+          </div>
+
+          <div className="bg-white rounded-[32px] border border-rose-200/60 p-6 shadow-sm mt-4">
+            <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-4">Zona de Perigo</h3>
+            {showPatientDeleteConfirm ? (
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-slate-500 leading-normal">
+                  Esta ação excluirá permanentemente o paciente e todo o seu histórico clínico. Tem certeza?
+                </p>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={handleDeletePatient}
+                    disabled={saving}
+                    className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {saving ? <Loader2 size={12} className="animate-spin" /> : "Confirmar"}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setShowPatientDeleteConfirm(false)}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-[9px] uppercase transition-all"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button 
+                type="button"
+                onClick={() => setShowPatientDeleteConfirm(true)}
+                className="w-full py-2.5 bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2"
+              >
+                <Trash2 size={14} /> Excluir Paciente
+              </button>
+            )}
           </div>
         </div>
 
@@ -922,19 +1130,19 @@ function PatientProfileContent() {
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total em Tratamentos</p>
                   <h4 className="text-2xl font-black text-slate-900">
-                    R$ {(history as any)?.financialSummary?.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
+                    R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </h4>
                 </div>
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pago</p>
                   <h4 className="text-2xl font-black text-emerald-600">
-                    R$ {(history as any)?.financialSummary?.totalPaid?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
+                    R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </h4>
                 </div>
                 <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Devedor</p>
                   <h4 className="text-2xl font-black text-rose-600">
-                    R$ {(history as any)?.financialSummary?.balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || "0,00"}
+                    R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </h4>
                 </div>
               </div>
@@ -985,7 +1193,7 @@ function PatientProfileContent() {
                         <tr className="bg-slate-50 border-b border-slate-100">
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
-                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Valor Unitário</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Valor Pago / Total</th>
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
                         </tr>
                       </thead>
@@ -1003,7 +1211,16 @@ function PatientProfileContent() {
                             const valPerInst = (inter.value || 0) / totalInst;
                             
                             return (
-                              <tr key={inter.id} className="hover:bg-slate-50/50 transition-colors">
+                              <tr
+                                key={inter.id}
+                                data-nrotra={inter.nroTra}
+                                className={cn(
+                                  "transition-all duration-700",
+                                  inter.nroTra && highlightedTra === inter.nroTra
+                                    ? "bg-blue-50 ring-2 ring-inset ring-blue-400 shadow-md"
+                                    : "hover:bg-slate-50/50"
+                                )}
+                              >
                                 <td className="px-6 py-4">
                                   <p className="text-sm font-black text-slate-900">{inter.procedure}</p>
                                   <p className="text-[10px] font-black text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
@@ -1041,10 +1258,66 @@ function PatientProfileContent() {
                                     <span className="text-[10px] font-black text-slate-400 uppercase">de {totalInst}</span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <p className="text-xs font-black text-slate-900">R$ {valPerInst.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                </td>
+                                 <td className="px-6 py-4">
+                                   {editingValueId === inter.id ? (
+                                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                                       <span className="text-[9px] font-black text-slate-400 uppercase">Valor Total</span>
+                                       <div className="flex items-center gap-1.5">
+                                         <div className="relative flex items-center">
+                                           <span className="absolute left-2.5 text-xs font-black text-slate-400">R$</span>
+                                           <input 
+                                             type="text"
+                                             className="w-24 bg-white border border-slate-200 rounded-xl pl-8 pr-2.5 py-1.5 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                             value={editingValueText}
+                                             onChange={(e) => {
+                                               const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                               setEditingValueText(val);
+                                             }}
+                                             autoFocus
+                                             onKeyDown={async (e) => {
+                                               if (e.key === 'Enter') {
+                                                 await handleSaveValue(inter);
+                                               } else if (e.key === 'Escape') {
+                                                 setEditingValueId(null);
+                                               }
+                                             }}
+                                           />
+                                         </div>
+                                         <button 
+                                           onClick={async () => await handleSaveValue(inter)}
+                                           className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center shadow-sm"
+                                           title="Salvar"
+                                         >
+                                           <Check size={14} className="stroke-[3]" />
+                                         </button>
+                                         <button 
+                                           onClick={() => setEditingValueId(null)}
+                                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-colors flex items-center justify-center"
+                                           title="Cancelar"
+                                         >
+                                           <X size={14} className="stroke-[3]" />
+                                         </button>
+                                       </div>
+                                     </div>
+                                   ) : (
+                                     <div 
+                                       className="group relative cursor-pointer hover:bg-slate-50 p-2 rounded-2xl transition-colors -m-2"
+                                       title="Clique para editar o valor"
+                                       onClick={() => {
+                                         setEditingValueId(inter.id);
+                                         setEditingValueText(inter.value.toString());
+                                       }}
+                                     >
+                                       <p className="text-xs font-black text-slate-900">
+                                         R$ {(paidInst * valPerInst).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                       </p>
+                                       <div className="flex items-center gap-1 mt-0.5">
+                                         <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                         <Edit2 size={10} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                                       </div>
+                                     </div>
+                                   )}
+                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
                                     {["Em Aberto", "Concluído"].map(s => (
@@ -1175,6 +1448,7 @@ function PatientProfileContent() {
                         className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                         value={patientEditForm?.nickname || ""}
                         onChange={(e) => setPatientEditForm({ ...patientEditForm, nickname: e.target.value })}
+                        onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div>
@@ -1182,7 +1456,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.sex || "2"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, sex: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, sex: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {genders.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                         </select>
@@ -1192,7 +1470,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.maritalStatus || "6"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, maritalStatus: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, maritalStatus: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {maritalStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
@@ -1204,6 +1486,7 @@ function PatientProfileContent() {
                         className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                         value={patientEditForm?.cpf || ""}
                         onChange={(e) => setPatientEditForm({ ...patientEditForm, cpf: maskCPF(e.target.value) })}
+                        onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div>
@@ -1213,6 +1496,7 @@ function PatientProfileContent() {
                         className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                         value={patientEditForm?.rg || ""}
                         onChange={(e) => setPatientEditForm({ ...patientEditForm, rg: maskRG(e.target.value) })}
+                        onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div>
@@ -1221,7 +1505,11 @@ function PatientProfileContent() {
                         type="date"
                         className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                         value={patientEditForm?.birthDate ? new Date(patientEditForm.birthDate).toISOString().split('T')[0] : ""}
-                        onChange={(e) => setPatientEditForm({ ...patientEditForm, birthDate: e.target.value })}
+                        onChange={(e) => {
+                            const updated = { ...patientEditForm, birthDate: e.target.value };
+                            setPatientEditForm(updated);
+                            saveIfChanged(updated);
+                        }}
                         />
                     </div>
                     <div>
@@ -1231,6 +1519,7 @@ function PatientProfileContent() {
                         className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                         value={patientEditForm?.profession || ""}
                         onChange={(e) => setPatientEditForm({ ...patientEditForm, profession: e.target.value })}
+                        onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                   </div>
@@ -1253,6 +1542,7 @@ function PatientProfileContent() {
                             className="flex-1 bg-transparent border-none p-0 text-sm font-bold text-slate-700 focus:ring-0"
                             value={patientEditForm?.address || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, address: e.target.value })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                             />
                         </div>
                     </div>
@@ -1263,6 +1553,7 @@ function PatientProfileContent() {
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.neighborhood || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, neighborhood: e.target.value })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div className="md:col-span-2">
@@ -1272,6 +1563,7 @@ function PatientProfileContent() {
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.zipCode || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, zipCode: e.target.value })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div className="md:col-span-3">
@@ -1281,6 +1573,7 @@ function PatientProfileContent() {
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.city || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, city: e.target.value })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div>
@@ -1291,6 +1584,7 @@ function PatientProfileContent() {
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none text-center"
                             value={patientEditForm?.state || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, state: e.target.value.toUpperCase() })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                   </div>
@@ -1308,7 +1602,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.convenioId || "1"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, convenioId: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, convenioId: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {catalogOptions.convenios.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
@@ -1320,6 +1618,7 @@ function PatientProfileContent() {
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.registrationNumber || ""}
                             onChange={(e) => setPatientEditForm({ ...patientEditForm, registrationNumber: e.target.value })}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                         />
                     </div>
                     <div className="col-span-2">
@@ -1327,7 +1626,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.preferredProfessionalId || "1"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, preferredProfessionalId: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, preferredProfessionalId: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {catalogOptions.professionals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
@@ -1337,7 +1640,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.referralTypeId || "3"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, referralTypeId: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, referralTypeId: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {referralTypes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
@@ -1347,7 +1654,11 @@ function PatientProfileContent() {
                         <select 
                             className="w-full bg-slate-50/50 border border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition-all outline-none"
                             value={patientEditForm?.status || "2"}
-                            onChange={(e) => setPatientEditForm({ ...patientEditForm, status: e.target.value })}
+                            onChange={(e) => {
+                                const updated = { ...patientEditForm, status: e.target.value };
+                                setPatientEditForm(updated);
+                                saveIfChanged(updated);
+                            }}
                         >
                             {patientStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
@@ -1389,9 +1700,12 @@ function PatientProfileContent() {
                                 type="checkbox" 
                                 checked={item.responseId === '2'} 
                                 onChange={(e) => {
-                                    const newAnamnesis = [...patientEditForm.anamnesis];
-                                    newAnamnesis[idx].responseId = e.target.checked ? '2' : '0';
-                                    setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
+                                    const newAnamnesis = patientEditForm.anamnesis.map((item: any, i: number) => 
+                                        i === idx ? { ...item, responseId: e.target.checked ? '2' : '0' } : item
+                                    );
+                                    const updated = { ...patientEditForm, anamnesis: newAnamnesis };
+                                    setPatientEditForm(updated);
+                                    saveIfChanged(updated);
                                 }}
                                 className="w-3 h-3 accent-blue-600 shrink-0 mt-0.5"
                             />
@@ -1402,13 +1716,19 @@ function PatientProfileContent() {
                               "w-full bg-white/50 border border-slate-100 rounded-lg p-2 mt-2 text-xs font-bold leading-relaxed focus:ring-2 focus:ring-blue-500/10 resize-none outline-none transition-all",
                               item.responseId === '2' ? "text-rose-700 placeholder:text-rose-300 border-rose-100" : "text-slate-700 placeholder:text-slate-300"
                             )}
-                            value={item.alert || item.complement || ""}
+                            value={item.complement || ""}
                             onChange={(e) => {
-                                const newAnamnesis = [...patientEditForm.anamnesis];
-                                newAnamnesis[idx].complement = e.target.value;
-                                newAnamnesis[idx].alert = e.target.value; 
+                                const val = e.target.value;
+                                const newAnamnesis = patientEditForm.anamnesis.map((item: any, i: number) => 
+                                    i === idx ? { 
+                                        ...item, 
+                                        complement: val, 
+                                        responseId: val.trim() ? '2' : '0' 
+                                    } : item
+                                );
                                 setPatientEditForm({ ...patientEditForm, anamnesis: newAnamnesis });
                             }}
+                            onBlur={() => saveIfChanged(patientEditForm)}
                             placeholder="Descreva aqui..."
                           />
                         </div>

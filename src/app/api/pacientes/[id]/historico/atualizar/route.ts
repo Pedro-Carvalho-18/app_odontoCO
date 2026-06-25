@@ -46,6 +46,53 @@ export async function POST(
         [professionalId, value, statusValue, finalPaidInst !== undefined ? String(finalPaidInst) : null, patientId, id]
       );
 
+
+      // Sync/update debt records in CCPACIENTE to match the new value
+      if (interTraId && value !== undefined) {
+        const valPerInst = (Number(value) || 0) / totalInst;
+        const existingCharges = await db.all(
+          `SELECT REGISTRO FROM CCPACIENTE WHERE NROPAC = ? AND NROTRA = ? AND NROLAN IN ('4', '5')`,
+          [patientId, interTraId.toString()]
+        );
+
+        if (existingCharges.length > 0) {
+          await db.run(
+            `UPDATE CCPACIENTE 
+             SET VALOR = ? 
+             WHERE NROPAC = ? AND NROTRA = ? AND NROLAN IN ('4', '5')`,
+            [valPerInst.toFixed(2), patientId, interTraId.toString()]
+          );
+        } else if (Number(value) > 0 && !procedure?.includes("Alteração Odontograma")) {
+          const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + '.000';
+          const today = new Date().toISOString().split('T')[0] + " 00:00:00.000";
+          let procName = "Procedimento";
+          if (procedure) {
+            procName = procedure.split("|")[0].replace("PROCEDIMENTO:", "").trim();
+          }
+          for (let i = 1; i <= totalInst; i++) {
+            const lastCcRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+            const nextCcId = (Number(lastCcRow?.id) || 0) + 1;
+            await db.run(
+              `INSERT INTO CCPACIENTE (
+                REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+              ) VALUES (?, ?, ?, ?, '4', '255', ?, 'SISTEMA', ?, ?, ?, ?)`,
+              [
+                nextCcId.toString(),
+                patientId,
+                today,
+                `${procName} (Parc ${i}/${totalInst})`,
+                valPerInst.toFixed(2),
+                now,
+                today,
+                interTraId.toString(),
+                i.toString()
+              ]
+            );
+          }
+        }
+      }
+
       // Gerar registro financeiro na conta do paciente (CCPACIENTE) se houver novas parcelas pagas e valor > 0
       if (finalPaidInst !== undefined && finalPaidInst > oldPaidInst && Number(value) > 0 && !procedure?.includes("Alteração Odontograma")) {
         const valPerInst = (Number(value) || 0) / totalInst;

@@ -42,6 +42,7 @@ import {
   Heart,
   Maximize,
   AlertCircle,
+  AlertTriangle,
   FileBadge,
   DollarSign,
   Microscope,
@@ -116,6 +117,24 @@ export default function PatientRecordPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatientDetails, setSelectedPatientDetails] = useState<any>(null);
+
+  useEffect(() => {
+    if (!selectedPatient) {
+      setSelectedPatientDetails(null);
+      return;
+    }
+    const fetchPatientDetails = async () => {
+      try {
+        const res = await fetch(`/api/pacientes/${selectedPatient.id}`);
+        const data = await res.json();
+        setSelectedPatientDetails(data);
+      } catch (err) {
+        console.error("Erro ao buscar detalhes do paciente:", err);
+      }
+    };
+    fetchPatientDetails();
+  }, [selectedPatient]);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -214,6 +233,15 @@ export default function PatientRecordPage() {
   const [procedureFaces, setProcedureFaces] = useState({ top: false, bottom: false, left: false, right: false, center: false });
   const [discountValue, setDiscountValue] = useState("");
   const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [healthConfirmation, setHealthConfirmation] = useState(false);
+  const [activeLaunchStep, setActiveLaunchStep] = useState<'dados' | 'tratamento' | 'financeiro'>('dados');
+
+  useEffect(() => {
+    if (!showLaunchModal) {
+      setHealthConfirmation(false);
+      setActiveLaunchStep('dados');
+    }
+  }, [showLaunchModal]);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [showAtestadoModal, setShowAtestadoModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
@@ -261,6 +289,21 @@ export default function PatientRecordPage() {
     observacoes: "",
   });
   const [finalConsentText, setFinalConsentText] = useState("");
+  const [clinicInfo, setClinicInfo] = useState<any>(null);
+  const [showHealthAlertDetails, setShowHealthAlertDetails] = useState(false);
+
+  const generateClinicHeader = useCallback(() => {
+    if (!clinicInfo) {
+      return "CONSULTÓRIO ODONTOLÓGICO\nAl. Rogério Pinto Ferráz 257\n14802-362 - Araraquara - SP\n\n\n";
+    }
+    const name = clinicInfo.name || "Consultório Odontológico";
+    const address = `${clinicInfo.address || ""}, ${clinicInfo.number || ""}${clinicInfo.complement ? " - " + clinicInfo.complement : ""}`;
+    const location = `${clinicInfo.neighborhood || ""} - ${clinicInfo.city || ""} - ${clinicInfo.state || ""}`;
+    const zipPhone = `CEP: ${clinicInfo.zipCode || ""} | Fone: ${clinicInfo.phone || ""}`;
+    
+    return `${name.toUpperCase()}\n${address}\n${location}\n${zipPhone}\n\n\n`;
+  }, [clinicInfo]);
+
   const [medicationsDB, setMedicationsDB] = useState<{ 
     code: number; 
     name: string;
@@ -286,14 +329,21 @@ export default function PatientRecordPage() {
   useEffect(() => {
     async function loadCatalog() {
       try {
-        const [catRes, medRes] = await Promise.all([
+        const [catRes, medRes, clinicRes] = await Promise.all([
             fetch('/api/catalogo', { cache: 'no-store' }),
-            fetch('/api/medicamentos', { cache: 'no-store' })
+            fetch('/api/medicamentos', { cache: 'no-store' }),
+            fetch('/api/configuracoes/clinica', { cache: 'no-store' })
         ]);
         const catalogData = await catRes.json();
         const medsData = await medRes.json();
+        const clinicData = await clinicRes.json();
         setCatalogData(catalogData);
         setMedicationsDB(medsData);
+        if (!clinicRes.ok || clinicData.error) {
+          console.warn("Could not load clinic config");
+        } else {
+          setClinicInfo(clinicData);
+        }
       } catch (err) { console.error(err); } finally { setLoadingCatalog(false); }
     }
     loadCatalog();
@@ -931,6 +981,16 @@ export default function PatientRecordPage() {
   const upperJaw = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
   const lowerJaw = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
+  const isDadosPrincipaisFilled = !!procedureDate && !!procedureTime && !!selectedProfessionalId;
+  const isTratamentoFilled = !!selectedTreatment;
+  const isFinanceiroFilled = !!selectedPaymentId && selectedPaymentId !== 'none' && !!treatmentValue && treatmentValue !== 'R$ 0,00';
+
+  const isDangerousProcedure = (name: string) => {
+    const dangerousKeywords = ["cirurgia", "extração", "implante", "canal", "enxerto", "siso", "endodontia", "exodontia", "apicectomia", "frenectomia", "gengivectomia"];
+    const n = name.toLowerCase();
+    return dangerousKeywords.some(keyword => n.includes(keyword));
+  };
+
   if (!initialLoadDone) return <div className="flex h-screen items-center justify-center font-black uppercase text-slate-400">Carregando...</div>;
 
   return (
@@ -1316,13 +1376,13 @@ export default function PatientRecordPage() {
                 {isActionMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-[140]" onClick={() => setIsActionMenuOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="p-2 flex flex-col gap-1">
                         <button 
                           onClick={() => { setShowPrescriptionModal(true); setIsActionMenuOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-xl transition-all group"
                         >
-                          <Pill size={18} className="text-slate-400 group-hover:text-blue-500" />
+                          <Pill size={18} className="text-slate-400 group-hover:text-blue-500 shrink-0" />
                           <span className="text-[11px] font-black uppercase tracking-wider">Receituário</span>
                         </button>
                         
@@ -1330,7 +1390,7 @@ export default function PatientRecordPage() {
                           onClick={() => { setShowAtestadoModal(true); setIsActionMenuOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 text-slate-700 hover:text-emerald-600 rounded-xl transition-all group"
                         >
-                          <FileBadge size={18} className="text-slate-400 group-hover:text-emerald-500" />
+                          <FileBadge size={18} className="text-slate-400 group-hover:text-emerald-500 shrink-0" />
                           <span className="text-[11px] font-black uppercase tracking-wider">Gerar Atestado</span>
                         </button>
 
@@ -1338,15 +1398,15 @@ export default function PatientRecordPage() {
                           onClick={() => { setShowConsentModal(true); setIsActionMenuOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 rounded-xl transition-all group"
                         >
-                          <ShieldCheck size={18} className="text-slate-400 group-hover:text-indigo-500" />
-                          <span className="text-[11px] font-black uppercase tracking-wider">Termo de Consentimento</span>
+                          <ShieldCheck size={18} className="text-slate-400 group-hover:text-indigo-500 shrink-0" />
+                          <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">Termo de Consentimento</span>
                         </button>
 
                         <button 
                           onClick={() => { setShowReceiptModal(true); setIsActionMenuOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl transition-all group"
                         >
-                          <DollarSign size={18} className="text-slate-400 group-hover:text-rose-500" />
+                          <DollarSign size={18} className="text-slate-400 group-hover:text-rose-500 shrink-0" />
                           <span className="text-[11px] font-black uppercase tracking-wider">Gerar Recibo</span>
                         </button>
 
@@ -1355,7 +1415,7 @@ export default function PatientRecordPage() {
                             onClick={() => { setShowFilesModal(true); setIsActionMenuOpen(false); }}
                             className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 text-slate-700 hover:text-amber-600 rounded-xl transition-all group border-t border-slate-50 mt-1"
                           >
-                            <Folder size={18} className="text-slate-400 group-hover:text-amber-500" />
+                            <Folder size={18} className="text-slate-400 group-hover:text-amber-500 shrink-0" />
                             <span className="text-[11px] font-black uppercase tracking-wider">Arquivos / Docs</span>
                           </button>
                         )}
@@ -1518,224 +1578,469 @@ export default function PatientRecordPage() {
           <div className="bg-slate-50 w-full h-full flex flex-col">
             <div className="px-8 py-3 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
                <div className="flex items-center gap-2.5">
-                 <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg">
-                   <Plus size={16} />
-                 </div>
-                 <h3 className="text-[12px] font-black uppercase text-slate-900">
-                   Novo Lançamento - {catalogData?.specialties?.find(s => s.id === expandedCategories[0])?.name || "Geral"}
-                 </h3>
+                  <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg">
+                    <Plus size={16} />
+                  </div>
+                  <h3 className="text-[12px] font-black uppercase text-slate-900">
+                    Novo Lançamento - ${catalogData?.specialties?.find(s => s.id === expandedCategories[0])?.name || "Geral"}
+                  </h3>
                </div>
                <button onClick={() => setShowLaunchModal(false)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
             </div>
-            <div className="flex-1 overflow-hidden flex justify-center bg-slate-50">
-               <div className="w-full p-8 overflow-y-auto custom-scrollbar">
-                  <div className="max-w-6xl mx-auto space-y-4">
+            
+            {/* Split layout: Left Timeline Sidebar and Right Content panel */}
+            <div className="flex-1 overflow-hidden flex bg-slate-50">
+               {/* Left Sidebar */}
+               <div className="w-80 border-r border-slate-200 bg-white p-8 flex flex-col justify-between shrink-0 shadow-[2px_0_8px_rgba(0,0,0,0.02)]">
+                  <div className="space-y-8">
+                     <div>
+                        <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Etapas do Lançamento</h4>
+                        <p className="text-xs text-slate-500 mt-1 leading-normal">Selecione as abas ou utilize os botões para navegar pelas etapas.</p>
+                     </div>
+
+                     <div className="relative pl-1 space-y-8">
+                        {/* Vertical connection line */}
+                        <div className="absolute left-[13px] top-2 bottom-2 w-0.5 bg-slate-100" />
+
+                        {[
+                           { id: 'dados', label: 'Dados Principais', desc: 'Data, profissional e status', isFilled: isDadosPrincipaisFilled },
+                           { id: 'tratamento', label: 'Tratamento', desc: 'Procedimento e dente', isFilled: isTratamentoFilled },
+                           { id: 'financeiro', label: 'Financeiro', desc: 'Valores e forma de pagamento', isFilled: isFinanceiroFilled }
+                        ].map((step, idx) => {
+                           const isActive = activeLaunchStep === step.id;
+                           const isFilled = step.isFilled;
+                           return (
+                              <button
+                                 key={step.id}
+                                 type="button"
+                                 onClick={() => setActiveLaunchStep(step.id as any)}
+                                 className="flex items-start gap-4 text-left group w-full relative z-10 outline-none"
+                              >
+                                 <div className="relative flex items-center justify-center shrink-0">
+                                    <div className={cn(
+                                       "w-7 h-7 rounded-full flex items-center justify-center font-black text-xs transition-all duration-300 border-2",
+                                       isFilled 
+                                          ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20" 
+                                          : isActive 
+                                             ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20" 
+                                             : "bg-white border-slate-300 text-slate-400 group-hover:border-slate-400 group-hover:bg-slate-50"
+                                    )}>
+                                       {isFilled ? (
+                                          <CheckCircle2 size={14} className="stroke-[3]" />
+                                       ) : (
+                                          <span>{idx + 1}</span>
+                                       )}
+                                    </div>
+                                 </div>
+                                 <div className="space-y-0.5">
+                                    <p className={cn(
+                                       "text-[12px] font-black uppercase tracking-tight transition-colors",
+                                       isActive ? "text-blue-600" : isFilled ? "text-emerald-600" : "text-slate-500 group-hover:text-slate-700"
+                                    )}>
+                                       {step.label}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                       {step.desc}
+                                    </p>
+                                 </div>
+                              </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+
+                  {/* Red alert card on left sidebar if patient has clinical risk */}
+                  {selectedPatientDetails?.anamnesis && selectedPatientDetails.anamnesis.length > 0 ? (
+                     <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 animate-pulse">
+                        <div className="flex items-center gap-2 text-rose-700">
+                           <AlertTriangle size={16} className="shrink-0" />
+                           <span className="text-[10px] font-black uppercase tracking-wider">Risco Clínico</span>
+                        </div>
+                        <p className="text-[10px] text-rose-600 mt-1 leading-normal font-bold">
+                           Atenção! Este paciente possui condições clínicas de alerta que exigem confirmação.
+                        </p>
+                     </div>
+                  ) : (
+                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+                        <div className="flex items-center gap-2 text-slate-700">
+                           <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                           <span className="text-[10px] font-black uppercase tracking-wider">Histórico Protegido</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-normal font-bold">
+                           As informações de tratamento e faturamento serão salvas de forma segura diretamente no histórico do paciente.
+                        </p>
+                     </div>
+                  )}
+               </div>
+
+               {/* Right Content Area */}
+               <div className="flex-1 p-8 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+                  <div className="max-w-4xl mx-auto w-full space-y-6">
                      
-                     {/* LINHA 1: Data, Hora e Status */}
-                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
-                        <div className="grid grid-cols-3 gap-6">
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Data do Procedimento</label>
-                              <input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                     {/* SEÇÃO 1: Dados Principais */}
+                     {activeLaunchStep === 'dados' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                           <div className="border-b border-slate-200 pb-4">
+                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-wider">Dados Principais</h4>
+                              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Defina o profissional, data e status do atendimento</p>
                            </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Horário</label>
-                              <input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                           
+                           {/* LINHA 1: Data, Hora e Status */}
+                           <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm">
+                              <div className="grid grid-cols-3 gap-6">
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Data do Procedimento</label>
+                                    <input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Horário</label>
+                                    <input type="time" value={procedureTime} onChange={e => setProcedureTime(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[48px]" />
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Status</label>
+                                    <div className="flex bg-slate-50 rounded-xl border border-slate-200 p-1 h-[48px]">
+                                       <button type="button" onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-900" : "text-slate-500 hover:bg-slate-100")}>PENDENTE</button>
+                                       <button type="button" onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-100")}>CONCLUÍDO</button>
+                                    </div>
+                                 </div>
+                              </div>
                            </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Status</label>
-                              <div className="flex bg-slate-50 rounded-xl border border-slate-200 p-1 h-[48px]">
-                                 <button onClick={() => setProcedureStatus("A Fazer")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "A Fazer" ? "bg-amber-100 text-amber-900" : "text-slate-500 hover:bg-slate-100")}>PENDENTE</button>
-                                 <button onClick={() => setProcedureStatus("Concluído")} className={cn("flex-1 text-[11px] font-black rounded-lg transition-colors", procedureStatus === "Concluído" ? "bg-emerald-100 text-emerald-900" : "text-slate-500 hover:bg-slate-100")}>CONCLUÍDO</button>
+
+                           {/* LINHA 2: Dentista e Paciente */}
+                           <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm">
+                              <div className="grid grid-cols-2 gap-6">
+                                 <div className="space-y-1.5 relative">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dentista Responsável</label>
+                                    <button type="button" onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                       <p className="text-[14px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione o Dentista..."}</p>
+                                       <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isProfessionalExpanded ? "rotate-180" : "")} />
+                                    </button>
+                                    {isProfessionalExpanded && (
+                                       <div className="absolute top-[60px] left-0 right-0 z-[250] bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                          {catalogData?.professionals?.map(p => <button type="button" key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "text-slate-900 hover:bg-slate-100")}>{p.name}</button>)}
+                                       </div>
+                                    )}
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Nome do Paciente</label>
+                                    <input type="text" value={selectedPatient?.name || ""} disabled className="w-full p-3 bg-blue-50 border border-blue-100 rounded-xl text-[14px] font-black text-blue-700 outline-none h-[48px]" />
+                                 </div>
                               </div>
                            </div>
                         </div>
-                     </div>
+                     )}
 
-                     {/* LINHA 2: Dentista e Paciente */}
-                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
-                        <div className="grid grid-cols-2 gap-6">
-                           <div className="space-y-1.5 relative">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dentista Responsável</label>
-                              <button onClick={() => {setIsProfessionalExpanded(!isProfessionalExpanded); setIsConvenioExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
-                                 <p className="text-[14px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.professionals?.find(p => p.id === selectedProfessionalId)?.name || "Selecione o Dentista..."}</p>
-                                 <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isProfessionalExpanded ? "rotate-180" : "")} />
-                              </button>
-                              {isProfessionalExpanded && (
-                                 <div className="absolute top-[60px] left-0 right-0 z-[250] bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                    {catalogData?.professionals?.map(p => <button key={p.id} onClick={() => { setSelectedProfessionalId(p.id); setIsProfessionalExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedProfessionalId === p.id ? "bg-blue-600 text-white" : "text-slate-900 hover:bg-slate-100")}>{p.name}</button>)}
-                                 </div>
-                              )}
+                     {/* SEÇÃO 2: Tratamento */}
+                     {activeLaunchStep === 'tratamento' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                           <div className="border-b border-slate-200 pb-4">
+                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-wider">Tratamento</h4>
+                              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Selecione o procedimento, dente e faces correspondentes</p>
                            </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Nome do Paciente</label>
-                              <input type="text" value={selectedPatient?.name || ""} disabled className="w-full p-3 bg-blue-50 border border-blue-100 rounded-xl text-[14px] font-black text-blue-700 outline-none h-[48px]" />
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* LINHA 3: Procedimento e Dente */}
-                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
-                        <div className="grid grid-cols-12 gap-6">
-                                                      <div className="col-span-8 space-y-1.5 relative">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Procedimento</label>
-                              <div className="relative group">
-                                 <div className="relative">
-                                    <input 
-                                       type="text"
-                                       placeholder="Pesquisar procedimento..."
-                                       value={selectedTreatment || procedureSearchTerm}
-                                       onChange={(e) => {
-                                          const val = e.target.value;
-                                          setProcedureSearchTerm(val);
-                                          if (selectedTreatment) {
-                                             setSelectedTreatment(null);
-                                             setSelectedTreatmentId(null);
-                                             setSelectedProcedures([]);
-                                             setTreatmentValue("");
-                                          }
-                                       }}
-                                       onFocus={() => { 
-                                          setIsProcedureSearchFocused(true);
-                                          if (!selectedTreatment) setProcedureSearchTerm(procedureSearchTerm || ""); 
-                                       }}
-                                       onBlur={() => setTimeout(() => setIsProcedureSearchFocused(false), 200)}
-                                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px] focus:border-blue-500 focus:bg-white transition-all pl-12"
-                                    />
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                                    {(procedureSearchTerm || selectedTreatment) && (
-                                       <button 
-                                          onClick={() => {
-                                             setProcedureSearchTerm("");
-                                             setSelectedTreatment(null);
-                                             setSelectedTreatmentId(null);
-                                             setSelectedProcedures([]);
-                                             setTreatmentValue("");
-                                          }}
-                                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
-                                       >
-                                          <X size={18} />
-                                       </button>
-                                    )}
-                                 </div>
-
-                                 {/* Dropdown de Resultados */}
-                                 {(procedureSearchTerm || isProcedureSearchFocused) && !selectedTreatment && (
-                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[300] max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                                       {catalogData?.procedures
-                                          .filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm)))
-                                          .sort((a, b) => a.name.localeCompare(b.name))
-                                          .map(proc => (
+                           
+                           {/* LINHA 3: Procedimento e Dente */}
+                           <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm">
+                              <div className="grid grid-cols-12 gap-6">
+                                 <div className="col-span-8 space-y-1.5 relative">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Procedimento</label>
+                                    <div className="relative group">
+                                       <div className="relative">
+                                          <input 
+                                             type="text"
+                                             placeholder="Pesquisar procedimento..."
+                                             value={selectedTreatment || procedureSearchTerm}
+                                             onChange={(e) => {
+                                                const val = e.target.value;
+                                                setProcedureSearchTerm(val);
+                                                if (selectedTreatment) {
+                                                   setSelectedTreatment(null);
+                                                   setSelectedTreatmentId(null);
+                                                   setSelectedProcedures([]);
+                                                   setTreatmentValue("");
+                                                }
+                                             }}
+                                             onFocus={() => { 
+                                                setIsProcedureSearchFocused(true);
+                                                if (!selectedTreatment) setProcedureSearchTerm(procedureSearchTerm || ""); 
+                                             }}
+                                             onBlur={() => setTimeout(() => setIsProcedureSearchFocused(false), 200)}
+                                             className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px] focus:border-blue-500 focus:bg-white transition-all pl-12"
+                                          />
+                                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                          {(procedureSearchTerm || selectedTreatment) && (
                                              <button 
-                                                key={proc.id} 
+                                                type="button"
                                                 onClick={() => {
-                                                   setSelectedTreatment(proc.name);
-                                                   setSelectedTreatmentId(proc.id);
-                                                   setSelectedProcedures([proc]);
-                                                   setTreatmentValue(formatCurrencyInput(Math.round((proc.price || 0) * 100).toString()));
                                                    setProcedureSearchTerm("");
+                                                   setSelectedTreatment(null);
+                                                   setSelectedTreatmentId(null);
+                                                   setSelectedProcedures([]);
+                                                   setTreatmentValue("");
                                                 }}
-                                                className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"
                                              >
-                                                <span className="font-black text-[11px] uppercase text-slate-700">{proc.name}</span>
-                                                <span className="text-[10px] font-black text-blue-600 shrink-0">{formatCurrencyInput(Math.round((proc.price || 0) * 100).toString())}</span>
+                                                <X size={18} />
                                              </button>
-                                          ))
-                                       }
-                                       {catalogData?.procedures.filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm))).length === 0 && (
-                                          <div className="p-4 text-center text-slate-400 text-[10px] font-black uppercase">Nenhum procedimento encontrado</div>
+                                          )}
+                                       </div>
+
+                                       {/* Dropdown de Resultados */}
+                                       {(procedureSearchTerm || isProcedureSearchFocused) && !selectedTreatment && (
+                                          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[300] max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
+                                             {catalogData?.procedures
+                                                .filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm)))
+                                                .sort((a, b) => a.name.localeCompare(b.name))
+                                                .map(proc => (
+                                                   <button 
+                                                      key={proc.id} 
+                                                      type="button"
+                                                      onClick={() => {
+                                                         setSelectedTreatment(proc.name);
+                                                         setSelectedTreatmentId(proc.id);
+                                                         setSelectedProcedures([proc]);
+                                                         setTreatmentValue(formatCurrencyInput(Math.round((proc.price || 0) * 100).toString()));
+                                                         setProcedureSearchTerm("");
+                                                      }}
+                                                      className="w-full p-3 text-left hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"
+                                                   >
+                                                      <span className="font-black text-[11px] uppercase text-slate-700">{proc.name}</span>
+                                                      <span className="text-[10px] font-black text-blue-600 shrink-0">{formatCurrencyInput(Math.round((proc.price || 0) * 100).toString())}</span>
+                                                   </button>
+                                                ))
+                                             }
+                                             {catalogData?.procedures.filter(p => p.specialtyId === expandedCategories[0] && normalizeString(p.name).includes(normalizeString(procedureSearchTerm))).length === 0 && (
+                                                <div className="p-4 text-center text-slate-400 text-[10px] font-black uppercase">Nenhum procedimento encontrado</div>
+                                             )}
+                                          </div>
                                        )}
+                                    </div>
+                                 </div>
+                                 <div className="col-span-4 space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dente / Região</label>
+                                    <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px]" />
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* LINHA 4: Observações e Faces */}
+                           <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm">
+                              <div className="grid grid-cols-12 gap-6">
+                                 <div className="col-span-4 space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Faces (Opcional)</label>
+                                    <div className="flex gap-1.5">
+                                       {['top', 'bottom', 'left', 'right', 'center'].map((face) => {
+                                          const labels: any = { top: 'V', bottom: 'L', left: 'D', right: 'M', center: 'O' };
+                                          return (
+                                             <button type="button" key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[48px] rounded-xl text-[12px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-300 text-slate-600 hover:border-blue-400")}>{labels[face]}</button>
+                                          );
+                                       })}
+                                    </div>
+                                 </div>
+                                 <div className="col-span-8 space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Notas Técnicas / Observações</label>
+                                    <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[14px] font-black text-slate-900 h-[48px] outline-none resize-none focus:bg-white focus:border-blue-300 transition-all placeholder:text-slate-300" />
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* ALERTA DE SAÚDE PARA PACIENTES COM RISCO CLÍNICO */}
+                           {selectedPatientDetails?.anamnesis && selectedPatientDetails.anamnesis.length > 0 && (
+                              <div className="border border-rose-200 rounded-[20px] overflow-hidden bg-white shadow-sm mt-2 transition-all duration-300">
+                                 {/* Compact Header / Trigger Button */}
+                                 <button 
+                                    type="button"
+                                    onClick={() => setShowHealthAlertDetails(!showHealthAlertDetails)}
+                                    className="w-full flex items-center justify-between p-4 bg-rose-50 hover:bg-rose-100/50 transition-all text-left"
+                                 >
+                                    <div className="flex items-center gap-3">
+                                       <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 animate-pulse">
+                                          <AlertTriangle size={18} />
+                                       </div>
+                                       <div>
+                                          <h4 className="text-[11px] font-black text-rose-800 uppercase tracking-wider flex items-center gap-2">
+                                             Risco Clínico Identificado
+                                             <span className="text-[9px] font-black bg-rose-200/80 px-2 py-0.5 rounded-full text-rose-800 uppercase tracking-widest ml-1">
+                                                {selectedPatientDetails.anamnesis.length} {selectedPatientDetails.anamnesis.length === 1 ? 'Alerta' : 'Alertas'}
+                                             </span>
+                                          </h4>
+                                          <p className="text-[10px] font-bold text-rose-600/80 mt-0.5">
+                                             Clique para visualizar as informações de saúde da anamnese.
+                                          </p>
+                                       </div>
+                                    </div>
+                                    <div className="text-rose-600 pr-2">
+                                       {showHealthAlertDetails ? (
+                                          <span className="text-[10px] font-black uppercase tracking-widest">Ocultar ▲</span>
+                                       ) : (
+                                          <span className="text-[10px] font-black uppercase tracking-widest">Visualizar ▼</span>
+                                       )}
+                                    </div>
+                                 </button>
+
+                                 {/* Expanding Details Content */}
+                                 {showHealthAlertDetails && (
+                                    <div className="p-5 border-t border-rose-100 bg-rose-50/10 space-y-4 animate-in slide-in-from-top duration-300">
+                                       <p className="text-[10px] font-bold text-rose-600">
+                                          Este paciente possui as seguintes condições registradas em sua anamnese:
+                                       </p>
+                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                          {selectedPatientDetails.anamnesis.map((item: any, idx: number) => (
+                                             <div key={idx} className="p-3 bg-white border border-rose-100 rounded-xl flex flex-col justify-center shadow-sm">
+                                                <p className="text-[9px] font-black text-rose-900 uppercase tracking-wider">{item.question}</p>
+                                                {item.complement ? (
+                                                   <p className="text-[10px] font-bold text-slate-700 mt-1 italic leading-tight">Detalhes: {item.complement}</p>
+                                                ) : (
+                                                   <p className="text-[9px] font-black text-rose-600 mt-1 uppercase">Resposta: Sim</p>
+                                                )}
+                                             </div>
+                                          ))}
+                                       </div>
                                     </div>
                                  )}
                               </div>
-                           </div>
-                           <div className="col-span-4 space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Dente / Região</label>
-                              <input type="text" placeholder="Ex: 16, Sup, Geral" value={manualTooth} onChange={e => setManualTooth(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[14px] font-black text-slate-900 outline-none h-[56px]" />
-                           </div>
-                        </div>
-                     </div>
+                           )}
 
-                     {/* LINHA 4: Observações e Faces */}
-                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm">
-                        <div className="grid grid-cols-12 gap-6">
-                           <div className="col-span-4 space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Faces (Opcional)</label>
-                              <div className="flex gap-1.5">
-                                 {['top', 'bottom', 'left', 'right', 'center'].map((face) => {
-                                    const labels: any = { top: 'V', bottom: 'L', left: 'D', right: 'M', center: 'O' };
-                                    return (
-                                       <button key={face} onClick={() => setProcedureFaces(p => ({ ...p, [face]: !(p as any)[face] }))} className={cn("flex-1 h-[48px] rounded-xl text-[12px] font-black border-2 transition-all", (procedureFaces as any)[face] ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-50 border-slate-300 text-slate-600 hover:border-blue-400")}>{labels[face]}</button>
-                                    );
-                                 })}
+                           {/* Campo de confirmação clínica (sempre visível se houver risco clínico para permitir avançar) */}
+                           {selectedPatientDetails?.anamnesis && selectedPatientDetails.anamnesis.length > 0 && (
+                              <div className="mt-3 flex items-center">
+                                 <label className="flex items-center gap-3 p-3 bg-rose-100/50 rounded-xl cursor-pointer hover:bg-rose-100 transition-colors w-fit border border-rose-200/50">
+                                    <input 
+                                       type="checkbox" 
+                                       checked={healthConfirmation} 
+                                       onChange={e => setHealthConfirmation(e.target.checked)} 
+                                       className="w-4 h-4 accent-rose-600 cursor-pointer shrink-0" 
+                                    />
+                                    <span className="text-[11px] font-black text-rose-800 uppercase tracking-tight">Estou ciente do histórico de saúde do paciente e confirmo a realização do procedimento</span>
+                                 </label>
                               </div>
-                           </div>
-                           <div className="col-span-8 space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Notas Técnicas / Observações</label>
-                              <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Descreva os detalhes deste atendimento..." className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[14px] font-black text-slate-900 h-[48px] outline-none resize-none focus:bg-white focus:border-blue-300 transition-all placeholder:text-slate-300" />
-                           </div>
+                           )}
                         </div>
-                     </div>
+                     )}
 
-                     {/* LINHA 5: Informações Bancárias / Financeiro */}
-                     <div className="bg-white p-6 rounded-[24px] border border-slate-300 shadow-sm border-t-4 border-t-emerald-500">
-                        <div className="grid grid-cols-4 gap-6">
-                           <div className="space-y-1.5 relative">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Convênio</label>
-                              <button onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
-                                 <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Particular"}</p>
-                                 <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isConvenioExpanded ? "rotate-180" : "")} />
-                              </button>
-                              {isConvenioExpanded && (
-                                 <div className="absolute bottom-full left-0 right-0 z-[250] mb-2 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
-                                    {catalogData?.convenios?.map(c => <button key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100")}>{c.name}</button>)}
+                     {/* SEÇÃO 3: Financeiro */}
+                     {activeLaunchStep === 'financeiro' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                           <div className="border-b border-slate-200 pb-4">
+                              <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-wider">Financeiro</h4>
+                              <p className="text-[11px] font-bold text-slate-400 mt-0.5">Informe as condições de pagamento e valor final</p>
+                           </div>
+                           
+                           {/* LINHA 5: Informações Bancárias / Financeiro */}
+                           <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm border-t-4 border-t-emerald-500">
+                              <div className="grid grid-cols-4 gap-6">
+                                 <div className="space-y-1.5 relative">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Convênio</label>
+                                    <button type="button" onClick={() => {setIsConvenioExpanded(!isConvenioExpanded); setIsProfessionalExpanded(false);}} className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors rounded-xl outline-none h-[48px]">
+                                       <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight truncate">{catalogData?.convenios?.find(c => c.id === selectedConvenioId)?.name || "Particular"}</p>
+                                       <ChevronDown size={18} className={cn("text-slate-600 transition-transform shrink-0", isConvenioExpanded ? "rotate-180" : "")} />
+                                    </button>
+                                    {isConvenioExpanded && (
+                                       <div className="absolute bottom-full left-0 right-0 z-[250] mb-2 bg-white border border-slate-300 shadow-2xl max-h-60 overflow-y-auto rounded-xl p-1.5">
+                                          {catalogData?.convenios?.map(c => <button type="button" key={c.id} onClick={() => { setSelectedConvenioId(c.id); setIsConvenioExpanded(false); }} className={cn("w-full text-left p-3 rounded-lg text-[13px] font-black border-b border-transparent transition-all", selectedConvenioId === c.id ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100")}>{c.name}</button>)}
+                                       </div>
+                                    )}
                                  </div>
-                              )}
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Pagamento</label>
-                              <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
-                                 <option value="none">Método...</option>
-                                 {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                              </select>
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Parcelas / Recebimento</label>
-                              <div className="flex gap-2">
-                                 <select value={installments} onChange={e => setInstallments(e.target.value)} className="w-20 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
-                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
-                                 </select>
-                                 <button onClick={() => setIsPaid(!isPaid)} className={cn("flex-1 px-2 text-[10px] font-black rounded-xl transition-all border", isPaid ? "bg-emerald-100 text-emerald-900 border-emerald-200" : "bg-rose-100 text-rose-900 border-rose-200")}>
-                                    {isPaid ? "PAGO" : "PENDENTE"}
-                                 </button>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Pagamento</label>
+                                    <select value={selectedPaymentId} onChange={e => setSelectedPaymentId(e.target.value)} className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
+                                       <option value="none">Método...</option>
+                                       {catalogData?.payments?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Parcelas / Recebimento</label>
+                                    <div className="flex gap-2">
+                                       <select value={installments} onChange={e => setInstallments(e.target.value)} className="w-20 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] font-black text-slate-900 outline-none h-[48px]">
+                                          {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n}x</option>)}
+                                       </select>
+                                       <button type="button" onClick={() => setIsPaid(!isPaid)} className={cn("flex-1 px-2 text-[10px] font-black rounded-xl transition-all border", isPaid ? "bg-emerald-100 text-emerald-900 border-emerald-200" : "bg-rose-100 text-rose-900 border-rose-200")}>
+                                          {isPaid ? "PAGO" : "PENDENTE"}
+                                       </button>
+                                    </div>
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Valor Final</label>
+                                    <input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[18px] font-black text-emerald-700 outline-none h-[48px]" />
+                                 </div>
                               </div>
                            </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[13px] font-black text-slate-900 uppercase ml-1">Valor Final</label>
-                              <input type="text" placeholder="R$ 0,00" value={treatmentValue} onChange={e => setTreatmentValue(formatCurrencyInput(e.target.value))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-[18px] font-black text-emerald-700 outline-none h-[48px]" />
-                           </div>
                         </div>
+                     )}
+                     
+                  </div>
+
+                  {/* Footers controls: Back, Next/Launch */}
+                  <div className="mt-8 border-t border-slate-200 pt-6 flex items-center justify-between">
+                     <div className="flex flex-col">
+                        <p className="text-[9px] font-black text-slate-400 uppercase">Procedimento</p>
+                        <p className="text-sm font-black uppercase text-slate-800 leading-tight">{selectedTreatment || "Nenhum"}</p>
+                        {selectedTreatment && (
+                           <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
+                              Total: {treatmentValue || "R$ 0,00"}
+                           </p>
+                        )}
+                     </div>
+                     <div className="flex items-center gap-3">
+                        <button 
+                           type="button"
+                           onClick={() => setShowLaunchModal(false)} 
+                           className="px-6 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100 transition-all"
+                        >
+                           Cancelar
+                        </button>
+                        
+                        {activeLaunchStep !== 'dados' && (
+                           <button 
+                              type="button"
+                              onClick={() => {
+                                 if (activeLaunchStep === 'financeiro') setActiveLaunchStep('tratamento');
+                                 else if (activeLaunchStep === 'tratamento') setActiveLaunchStep('dados');
+                              }} 
+                              className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-[10px] uppercase flex items-center gap-1.5 transition-all"
+                           >
+                              <ChevronLeft size={16} /> Voltar
+                           </button>
+                        )}
+
+                        {activeLaunchStep !== 'financeiro' ? (
+                           <button 
+                              type="button"
+                              onClick={() => {
+                                 if (activeLaunchStep === 'dados') setActiveLaunchStep('tratamento');
+                                 else if (activeLaunchStep === 'tratamento') setActiveLaunchStep('financeiro');
+                              }}
+                              disabled={!!(activeLaunchStep === 'tratamento' && selectedPatientDetails?.anamnesis?.length > 0 && !healthConfirmation)}
+                              className={cn(
+                                 "px-8 py-3 rounded-xl font-black text-[10px] uppercase flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/10",
+                                 (activeLaunchStep === 'tratamento' && selectedPatientDetails?.anamnesis?.length > 0 && !healthConfirmation)
+                                    ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                                    : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                              )}
+                           >
+                              Avançar <ChevronRight size={16} />
+                           </button>
+                        ) : (
+                           <button 
+                              type="button"
+                              onClick={handleLaunchTreatment} 
+                              disabled={!!(!selectedTreatment || (selectedPatientDetails?.anamnesis?.length > 0 && !healthConfirmation))} 
+                              className={cn(
+                                 "px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg transition-all", 
+                                 (selectedTreatment && (!selectedPatientDetails?.anamnesis?.length || healthConfirmation)) 
+                                    ? "bg-blue-600 text-white hover:bg-blue-700 active:scale-95 cursor-pointer" 
+                                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                              )}
+                           >
+                              Lançar no Prontuário
+                           </button>
+                        )}
                      </div>
                   </div>
                </div>
             </div>
-            <div className="px-6 py-[19px] border-t border-slate-200 bg-white flex items-center justify-between shadow-2xl">
-               <div className="flex flex-col">
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Procedimento</p>
-                  <p className="text-sm font-black uppercase text-slate-800 leading-tight">{selectedTreatment || "Nenhum"}</p>
-                  {selectedTreatment && (
-                     <p className="text-[10px] font-black text-blue-600 uppercase mt-1">
-                        Total: {treatmentValue || "R$ 0,00"}
-                     </p>
-                  )}
-               </div>
-               <div className="flex items-center gap-4"><button onClick={() => setShowLaunchModal(false)} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase text-slate-500 hover:bg-slate-100">Cancelar</button><button onClick={handleLaunchTreatment} disabled={!selectedTreatment} className={cn("px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg", selectedTreatment ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-200 text-slate-400")}>Lançar no Prontuário</button></div>
-            </div>
           </div>
         </div>
-      )}
-      
-      {showPrescriptionModal && (
+      )}      {showPrescriptionModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-0 animate-in fade-in duration-300">
           <div className="bg-slate-50 w-full h-full flex flex-col">
             <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 shadow-sm">
@@ -1877,13 +2182,15 @@ export default function PatientRecordPage() {
                            if (prescriptionForm.medication) items.push({...prescriptionForm});
                            if (items.length === 0) { alert("Adicione um medicamento."); return; }
 
-                           let docText = `\n\n\n\n\nPara\n${selectedPatient?.name}\n\n`;
+                           const header = generateClinicHeader();
+                           let docText = `${header}Para\n${selectedPatient?.name}\n\n`;
                            items.forEach((item, index) => {
                               docText += `${String(index + 1).padStart(2, '0')} - ${item.medication}\n      tomar ${item.quantity || '1'} de ${item.usage} ${item.observations ? '('+item.observations+')' : ''}\n\n`;
                            });
                            
                            const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-                           docText += `\n\n\nAraraquara, ${today}\n\n\n___________________________________\nDr(a). ${catalogData?.professionals?.find(p => p.id === prescriptionForm.professionalId)?.name || 'Profissional'}`;
+                           const city = clinicInfo?.city || "Araraquara";
+                           docText += `\n\n\n${city}, ${today}\n\n\n___________________________________\nDr(a). ${catalogData?.professionals?.find(p => p.id === prescriptionForm.professionalId)?.name || 'Profissional'}`;
                            
                            setFinalPrescriptionText(docText);
                            setPrescriptionStep('editor');
@@ -1913,7 +2220,7 @@ export default function PatientRecordPage() {
                         <textarea 
                            value={finalPrescriptionText}
                            onChange={(e) => setFinalPrescriptionText(e.target.value)}
-                           className="w-full h-full resize-none outline-none font-serif text-[15px] leading-relaxed"
+                           className="w-full h-full resize-none outline-none font-serif text-[15px] leading-relaxed lining-nums"
                            spellCheck="false"
                         />
                      </div>
@@ -2096,7 +2403,8 @@ export default function PatientRecordPage() {
                            let periodoStr = dtIni === dtFim ? `no dia ${dtIni}` : `no período de ${dtIni} a ${dtFim}`;
                            let horarioStr = atestadoForm.usaHorario ? `, no horário das ${atestadoForm.horarioInicio} às ${atestadoForm.horarioFim}` : "";
                            
-                           let docText = `Consultório Odontológico\nAl. Rogério Pinto Ferráz 257\n14802-362 - Araraquara - SP\n\n\n`;
+                           const header = generateClinicHeader();
+                           let docText = `${header}`;
                            docText += `ATESTADO ODONTOLÓGICO\n\n\n`;
                            docText += `Atesto para os devidos fins de direito, que o(a) Sr(a). ${selectedPatient?.name}, esteve sob meus cuidados profissionais ${periodoStr}${horarioStr}, por motivo de ${motivo.toLowerCase()}, estando sob minha responsabilidade.\n\n`;
                            
@@ -2105,7 +2413,8 @@ export default function PatientRecordPage() {
                            }
 
                            const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-                           docText += `\nAraraquara, ${today}\n\n\n`;
+                           const city = clinicInfo?.city || "Araraquara";
+                           docText += `\n${city}, ${today}\n\n\n`;
                            docText += `___________________________________\n`;
                            docText += `${profName}\n`;
                            if (profCro) docText += `CRO ${profCro}\n`;
@@ -2143,7 +2452,7 @@ export default function PatientRecordPage() {
                         <textarea 
                            value={finalAtestadoText}
                            onChange={(e) => setFinalAtestadoText(e.target.value)}
-                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center"
+                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center lining-nums"
                            spellCheck="false"
                         />
                      </div>
@@ -2274,7 +2583,8 @@ export default function PatientRecordPage() {
                            const profCro = professional?.cro || "";
                            const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
                            
-                           let docText = `Consultório Odontológico\nAl. Rogério Pinto Ferráz 257\n14802-362 - Araraquara - SP\n\n\n`;
+                           const header = generateClinicHeader();
+                           let docText = `${header}`;
                            docText += `TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO (TCLE)\n\n\n`;
                            docText += `Eu, ${selectedPatient?.name || "[Nome do Paciente]"}, declaro que fui devidamente informado(a) pelo(a) cirurgião(ã)-dentista ${profName} sobre os detalhes do tratamento de "${consentForm.procedureDescription || "[Nome do Procedimento]"}".\n\n`;
                            docText += `Fui esclarecido(a) quanto aos objetivos, riscos, benefícios, alternativas de tratamento e possíveis complicações decorrentes do procedimento proposto. Compreendo que na odontologia, como em qualquer ciência biológica, os resultados não são absolutamente garantidos e dependem também da resposta do meu organismo e dos cuidados pós-operatórios recomendados.\n\n`;
@@ -2284,7 +2594,8 @@ export default function PatientRecordPage() {
                               docText += `Observações Adicionais: ${consentForm.observacoes}\n\n`;
                            }
 
-                           docText += `\nAraraquara, ${today}\n\n\n`;
+                           const city = clinicInfo?.city || "Araraquara";
+                           docText += `\n${city}, ${today}\n\n\n`;
                            docText += `___________________________________\n`;
                            docText += `${selectedPatient?.name || "Paciente"}\n`;
                            docText += `Paciente / Responsável\n\n\n`;
@@ -2321,7 +2632,7 @@ export default function PatientRecordPage() {
                         <textarea 
                            value={finalConsentText}
                            onChange={(e) => setFinalConsentText(e.target.value)}
-                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center"
+                           className="w-full h-full resize-none outline-none font-serif text-[16px] leading-loose text-center lining-nums"
                            spellCheck="false"
                         />
                      </div>

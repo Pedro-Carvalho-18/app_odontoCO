@@ -117,14 +117,24 @@ export async function GET(
         ) GROUP BY NROPAC, NROINTPAC, NRODEN
       ) DF ON I.NROPAC = DF.NROPAC AND I.NROINTPAC = DF.NROINTPAC
       LEFT JOIN __SIMBOLO_ODONTO S ON COALESCE(PRC.NROSIM, T.ID_SIMBOLO) = S.NROSIM
-      LEFT JOIN __SIMBOLO_ODONTO S2 ON (
+      LEFT JOIN (
+        SELECT BITMAP1, MIN(ICONE) as ICONE, MIN(DESCRICAO) as DESCRICAO
+        FROM __SIMBOLO_ODONTO
+        WHERE BITMAP1 IS NOT NULL AND BITMAP1 != ''
+        GROUP BY BITMAP1
+      ) S2 ON (
         CASE 
           WHEN DF.BITMAP LIKE 'arc_%_%' THEN SUBSTR(DF.BITMAP, 5, INSTR(SUBSTR(DF.BITMAP, 5), '_') - 1)
           WHEN DF.BITMAP LIKE 'arc_%' THEN SUBSTR(DF.BITMAP, 5)
           ELSE DF.BITMAP
         END
       ) = S2.BITMAP1
-      LEFT JOIN __SIMBOLO_ODONTO S3 ON (
+      LEFT JOIN (
+        SELECT ICONE, MIN(DESCRICAO) as DESCRICAO
+        FROM __SIMBOLO_ODONTO
+        WHERE ICONE IS NOT NULL AND ICONE != ''
+        GROUP BY ICONE
+      ) S3 ON (
         CASE 
           WHEN DF.BITMAP LIKE 'icon:%' THEN SUBSTR(DF.BITMAP, 6)
           ELSE NULL
@@ -148,18 +158,24 @@ export async function GET(
          totalInst = parseInt(inter.installments) || 1;
       }
 
-      // 2. Calculate paid installments based on treatment progress
-      const totalPaid = parseFloat(inter.totalPaid) || 0;
-      const totalTraValue = parseFloat(inter.totalTraValue) || 0;
-      
+      // 2. Paid installments: use ORCAMENTO (from query) as primary source,
+      //    fall back to financial calculation only if ORCAMENTO is not set
       let paidInst = 0;
-      if (totalTraValue > 0) {
-        // Percentage of treatment paid
-        const progress = totalPaid / totalTraValue;
-        // Apply progress to installments
-        paidInst = Math.round(progress * totalInst);
-      } else if (totalPaid > 0) {
-        paidInst = totalInst;
+      const orcamentoValue = inter.paidInstallments;
+      
+      if (orcamentoValue !== null && orcamentoValue !== undefined && orcamentoValue !== '' && !isNaN(Number(orcamentoValue))) {
+        paidInst = Number(orcamentoValue);
+      } else {
+        // Fallback: calculate from financial records
+        const totalPaid = parseFloat(inter.totalPaid) || 0;
+        const totalTraValue = parseFloat(inter.totalTraValue) || 0;
+        
+        if (totalTraValue > 0) {
+          const progress = totalPaid / totalTraValue;
+          paidInst = Math.round(progress * totalInst);
+        } else if (totalPaid > 0) {
+          paidInst = totalInst;
+        }
       }
 
       // 3. Forced synchronization (Business logic requested by user)
@@ -247,14 +263,24 @@ export async function GET(
       LEFT JOIN TAB_PRC_ITEM PRC ON (I.NROINT = PRC.NROPROCTAB OR I.NROINT = PRC.ID_PRC_GEN) AND I.NROTAB = PRC.NROTAB
       LEFT JOIN TAB_GEN_ITEM GEN ON I.NROINT = GEN.ID_PRC_GEN
       LEFT JOIN __SIMBOLO_ODONTO S ON COALESCE(PRC.NROSIM, GEN.ID_SIMBOLO) = S.NROSIM
-      LEFT JOIN __SIMBOLO_ODONTO S2 ON (
+      LEFT JOIN (
+        SELECT BITMAP1, MIN(ICONE) as ICONE, MIN(DESCRICAO) as DESCRICAO
+        FROM __SIMBOLO_ODONTO
+        WHERE BITMAP1 IS NOT NULL AND BITMAP1 != ''
+        GROUP BY BITMAP1
+      ) S2 ON (
         CASE 
           WHEN DF.BITMAP LIKE 'arc_%_%' THEN SUBSTR(DF.BITMAP, 5, INSTR(SUBSTR(DF.BITMAP, 5), '_') - 1)
           WHEN DF.BITMAP LIKE 'arc_%' THEN SUBSTR(DF.BITMAP, 5)
           ELSE DF.BITMAP
         END
       ) = S2.BITMAP1
-      LEFT JOIN __SIMBOLO_ODONTO S3 ON (
+      LEFT JOIN (
+        SELECT ICONE, MIN(DESCRICAO) as DESCRICAO
+        FROM __SIMBOLO_ODONTO
+        WHERE ICONE IS NOT NULL AND ICONE != ''
+        GROUP BY ICONE
+      ) S3 ON (
         CASE 
           WHEN DF.BITMAP LIKE 'icon:%' THEN SUBSTR(DF.BITMAP, 6)
           ELSE NULL

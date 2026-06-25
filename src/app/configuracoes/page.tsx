@@ -479,12 +479,64 @@ export default function PerfilPage() {
               <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Building size={24} /></div>
-                  <div><h2 className="text-xl font-bold text-slate-900">Dados da Clínica</h2><p className="text-sm text-slate-500">Informações para receitas e orçamentos.</p></div>
+                  <div><h2 className="text-xl font-bold text-slate-900">Dados da Clínica</h2><p className="text-sm text-slate-500">Informações para receitas, atestados, recibos e orçamentos.</p></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-1.5 sm:col-span-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label><input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold" value={clinicData.name} onChange={e => setClinicData({...clinicData, name: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label><input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold" value={clinicData.razao} onChange={e => setClinicData({...clinicData, razao: e.target.value})} /></div>
-                  <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label><input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold" value={clinicData.cnpj} onChange={e => setClinicData({...clinicData, cnpj: e.target.value})} /></div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.name} onChange={e => setClinicData({...clinicData, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.razao} onChange={e => setClinicData({...clinicData, razao: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.cnpj} onChange={e => setClinicData({...clinicData, cnpj: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.phone} onChange={e => setClinicData({...clinicData, phone: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
+                    <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.email} onChange={e => setClinicData({...clinicData, email: e.target.value})} />
+                  </div>
+
+                  {/* Endereço */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <div className="h-px bg-slate-100 my-4" />
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Endereço do Consultório</h3>
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Logradouro / Endereço</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.address} onChange={e => setClinicData({...clinicData, address: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.number} onChange={e => setClinicData({...clinicData, number: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Complemento</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.complement} onChange={e => setClinicData({...clinicData, complement: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bairro</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.neighborhood} onChange={e => setClinicData({...clinicData, neighborhood: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.zipCode} onChange={e => setClinicData({...clinicData, zipCode: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" value={clinicData.city} onChange={e => setClinicData({...clinicData, city: e.target.value})} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado (UF)</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm font-bold focus:border-emerald-500 focus:bg-white transition-all" maxLength={2} value={clinicData.state} onChange={e => setClinicData({...clinicData, state: e.target.value})} />
+                  </div>
                 </div>
                 <div className="mt-8 pt-8 border-t border-slate-100 flex justify-end">
                   <button onClick={handleSaveClinic} disabled={saving} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl border-b-4 border-emerald-800 active:scale-95 disabled:opacity-50 flex items-center gap-2">

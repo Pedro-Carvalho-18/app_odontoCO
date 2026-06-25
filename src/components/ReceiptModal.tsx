@@ -36,13 +36,19 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split('T')[0]);
   const [finalText, setFinalText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [clinicInfo, setClinicInfo] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/pacientes/${patientId}/recibos/dados`);
+      const [res, clinRes] = await Promise.all([
+        fetch(`/api/pacientes/${patientId}/recibos/dados`),
+        fetch("/api/configuracoes/clinica")
+      ]);
       const json = await res.json();
+      const clinJson = await clinRes.json();
       setData(json);
+      setClinicInfo(clinJson);
       setCustomName(json.patient.name);
       setCustomCpf(json.patient.cpf);
     } catch (err) {
@@ -78,7 +84,11 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
     const dateObj = new Date(receiptDate);
     const dateStr = dateObj.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    let text = `\n\n\n\n`;
+    const header = clinicInfo 
+      ? `${clinicInfo.name.toUpperCase()}\n${clinicInfo.address || ""}, ${clinicInfo.number || ""}${clinicInfo.complement ? " - " + clinicInfo.complement : ""} - ${clinicInfo.neighborhood || ""}\n${clinicInfo.city || ""} - ${clinicInfo.state || ""} | CEP: ${clinicInfo.zipCode || ""}\nTelefone: ${clinicInfo.phone || ""} | E-mail: ${clinicInfo.email || ""}\n\n================================================================================\n\n`
+      : "CONSULTÓRIO ODONTOLÓGICO\nAl. Rogério Pinto Ferráz 257 - Araraquara - SP\n\n================================================================================\n\n";
+
+    let text = `${header}`;
     text += `          RECIBO DE PRESTAÇÃO DE SERVIÇOS ODONTOLÓGICOS\n\n\n`;
     text += `Recebi de ${customName || data.patient.name}, CPF nº ${customCpf || data.patient.cpf || '___.___.___-__'},\n`;
     text += `a importância de ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n`;
@@ -89,8 +99,11 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
     text += `${professional?.name || 'Cirurgião Dentista'}\n`;
     text += `CPF: ${professional?.cpf || ''}  CRO: ${professional?.cro || ''}\n\n\n`;
     text += `------------------------------------------\n`;
-    text += `Consultório Odontológico\n`;
-    text += `Al. Rogério Pinto Ferráz 257 - Araraquara - SP`;
+    const fullAddress = clinicInfo
+      ? `${clinicInfo.address || ""}${clinicInfo.number ? " " + clinicInfo.number : ""}${clinicInfo.complement ? " - " + clinicInfo.complement : ""}`
+      : 'Al. Rogério Pinto Ferráz 257';
+    text += `${clinicInfo?.name || 'Consultório Odontológico'}\n`;
+    text += `${fullAddress} - ${clinicInfo?.city || 'Araraquara'} - ${clinicInfo?.state || 'SP'}`;
 
     setFinalText(text);
     setStep('editor');
@@ -282,7 +295,7 @@ export function ReceiptModal({ isOpen, onClose, patientId }: ReceiptModalProps) 
                      <textarea 
                         value={finalText}
                         onChange={(e) => setFinalText(e.target.value)}
-                        className="w-full h-full resize-none outline-none font-mono text-[14px] leading-relaxed text-center"
+                        className="w-full h-full resize-none outline-none font-mono text-[14px] leading-relaxed text-center lining-nums"
                         spellCheck="false"
                      />
                   </div>

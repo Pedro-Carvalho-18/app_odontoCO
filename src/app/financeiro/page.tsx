@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 export default function FinanceiroPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -477,7 +479,15 @@ export default function FinanceiroPage() {
                  {filteredTransactions.map((t: any, idx: number) => (
                    <tr 
                     key={t.id || `row-${filterMode}-${idx}`} 
-                    onClick={() => setSelectedTransaction(t)}
+                    onClick={() => {
+                      if (t.nroPac) {
+                        const params = new URLSearchParams({ tab: 'financeiro' });
+                        if (t.nroTra) params.set('nroTra', t.nroTra);
+                        router.push(`/pacientes/${t.nroPac}?${params.toString()}`);
+                      } else {
+                        setSelectedTransaction(t);
+                      }
+                    }}
                     className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
                    >
                       <td className="px-4 py-4">
