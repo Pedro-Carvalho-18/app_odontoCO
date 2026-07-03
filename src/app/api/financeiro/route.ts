@@ -117,9 +117,184 @@ export async function GET(request: Request) {
     const totalIncome = allTransactions.reduce((sum, item) => item.type === 'income' ? sum + parseFloat(item.value || 0) : sum, 0);
     const totalExpense = allTransactions.reduce((sum, item) => item.type === 'expense' ? sum + parseFloat(item.value || 0) : sum, 0);
 
+    // 6. Buscar Intervenções Globais (Todos os Pacientes)
+    const interventions = await db.all(
+      `SELECT 
+        I.NROINTPAC as id,
+        'intervention' as type,
+        I.DATCAD as date,
+        I.TIME_STAMP_INS as createdAt,
+        COALESCE(
+          CASE 
+            WHEN I.OBSERV LIKE '%|%' THEN TRIM(SUBSTR(I.OBSERV, 1, INSTR(I.OBSERV, '|') - 1))
+            ELSE I.OBSERV 
+          END,
+          PRC.DESCRICAO, 
+          T.NOME, 
+          'Procedimento'
+        ) as procedure,
+        CASE 
+          WHEN I.OBSERV LIKE '%|%|%' THEN TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '|') + 1, INSTR(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '|') + 1), '|') - 1))
+          ELSE NULL
+        END as time,
+        CASE 
+          WHEN I.STATUS = '1' THEN 'Em Aberto'
+          WHEN I.STATUS = '2' THEN 'Concluído'
+          ELSE 'Em Aberto'
+        END as status,
+        COALESCE(TRIM(P.NOME), 'Profissional não identificado') as professional,
+        CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT) as value,
+        TRIM(COALESCE(I.S_DENTES, '')) as tooth,
+        I.OBSERV as notes,
+        CASE 
+          WHEN I.ORCAMENTO IS NOT NULL AND I.ORCAMENTO != '' THEN CAST(I.ORCAMENTO AS INTEGER)
+          WHEN I.STATUS = '2' THEN 
+            CASE 
+              WHEN I.OBSERV LIKE '%(%/%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, '/') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              WHEN I.OBSERV LIKE '%(%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              ELSE 1
+            END
+          ELSE 
+            CASE 
+              WHEN I.OBSERV LIKE '%(%/%x)%' THEN CAST(TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, '/') - INSTR(I.OBSERV, '(') - 1)) AS INTEGER)
+              ELSE 0
+            END
+        END as paidInstallments,
+        CASE 
+          WHEN I.OBSERV LIKE '%(%/%x)%' THEN TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '/') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '/') - 1))
+          WHEN I.OBSERV LIKE '%(%x)%' THEN TRIM(SUBSTR(I.OBSERV, INSTR(I.OBSERV, '(') + 1, INSTR(I.OBSERV, 'x)') - INSTR(I.OBSERV, '(') - 1))
+          ELSE '1'
+        END as installments,
+        COALESCE(TRIM(C.NOME), 'Particular') as convenio,
+        I.NROTRA as nroTra,
+        I.NROPAC as nroPac,
+        PAT.PRINOM as patientName,
+        COALESCE(FIN.totalPaid, 0) as totalPaid,
+        COALESCE(VTRA.totalValue, CAST(IFNULL(I.VALOR_PACIENTE, 0) AS FLOAT)) as totalTraValue
+      FROM INTERVENCAO I
+      INNER JOIN PESSOAL PAT ON I.NROPAC = PAT.NROPAC
+      LEFT JOIN TRATAMENTO TR ON I.NROTRA = TR.NROTRA
+      LEFT JOIN TAB_GEN_ITEM T ON I.NROINT = T.ID_PRC_GEN
+      LEFT JOIN TAB_PRC_ITEM PRC ON (I.NROINT = PRC.NROPROCTAB OR I.NROINT = PRC.ID_PRC_GEN) AND I.NROTAB = PRC.NROTAB
+      LEFT JOIN PRESTADOR P ON I.ID_PRESTADOR = P.ID_PRESTADOR
+      LEFT JOIN CONVENIO C ON TR.ID_CONVENIO = C.NROCONV
+      LEFT JOIN (
+        SELECT NROTRA, SUM(CAST(VALOR AS FLOAT)) as totalPaid
+        FROM CCPACIENTE 
+        WHERE NROLAN IN ('6', '7', '8', '105')
+        GROUP BY NROTRA
+      ) FIN ON I.NROTRA = FIN.NROTRA
+      LEFT JOIN (
+        SELECT NROTRA, SUM(CAST(VALOR_PACIENTE AS FLOAT)) as totalValue
+        FROM INTERVENCAO
+        GROUP BY NROTRA
+      ) VTRA ON I.NROTRA = VTRA.NROTRA
+      WHERE (DATE(I.DATCAD) BETWEEN DATE(?) AND DATE(?))
+         OR I.NROTRA IN (
+            SELECT DISTINCT NROTRA FROM CCPACIENTE 
+            WHERE DATE(DATA) BETWEEN DATE(?) AND DATE(?) 
+              AND NROLAN IN ('6', '7', '8', '105')
+         )
+      ORDER BY I.DATCAD DESC, CAST(I.NROINTPAC AS INTEGER) DESC`,
+      [start, end, start, end]
+    );
+
+    // Buscar pagamentos para essas intervenções
+    const payments = await db.all(
+      `SELECT 
+        C.REGISTRO as id,
+        C.DATA as date,
+        C.VALOR as value,
+        C.NROTRA as nroTra,
+        C.NROPAR as installment,
+        C.HISTORICO as description,
+        COALESCE(TP.NOME, 'Particular') as paymentMethod
+      FROM CCPACIENTE C
+      LEFT JOIN __TIPO_PAGTO TP ON C.TIPO_PAGTO = TP.REGISTRO
+      WHERE C.NROLAN IN ('6', '7', '8', '105')
+        AND C.NROTRA IN (
+          SELECT DISTINCT I.NROTRA 
+          FROM INTERVENCAO I
+          WHERE (DATE(I.DATCAD) BETWEEN DATE(?) AND DATE(?))
+             OR I.NROTRA IN (
+                SELECT DISTINCT NROTRA FROM CCPACIENTE 
+                WHERE DATE(DATA) BETWEEN DATE(?) AND DATE(?) 
+                  AND NROLAN IN ('6', '7', '8', '105')
+             )
+        )
+      ORDER BY C.DATA DESC, CAST(C.REGISTRO AS INTEGER) DESC`,
+      [start, end, start, end]
+    );
+
+    const processedInterventions = interventions
+      .filter(inter => !inter.procedure?.includes("Alteração Odontograma"))
+      .map(inter => {
+        let totalInst = 1;
+        if (inter.notes && inter.notes.includes('(') && inter.notes.includes('x)')) {
+          const match = inter.notes.match(/\((\d+)x\)/);
+          if (match) totalInst = parseInt(match[1]) || 1;
+        } else if (inter.installments) {
+          totalInst = parseInt(inter.installments) || 1;
+        }
+
+        let paymentMethod = 'Não informado';
+        if (inter.notes && inter.notes.includes('Pagamento:')) {
+          const parts = inter.notes.split('|');
+          const payPart = parts.find((p: string) => p.includes('Pagamento:'));
+          if (payPart) {
+            paymentMethod = payPart.replace('Pagamento:', '').split('(')[0].trim();
+          }
+        }
+
+        const interPayments = payments.filter(p => p.nroTra && String(p.nroTra) === String(inter.nroTra));
+
+        let paidInst = 0;
+        const orcamentoValue = inter.paidInstallments;
+        if (orcamentoValue !== null && orcamentoValue !== undefined && orcamentoValue !== '' && !isNaN(Number(orcamentoValue))) {
+          paidInst = Number(orcamentoValue);
+        } else {
+          const totalPaid = parseFloat(inter.totalPaid) || 0;
+          const totalTraValue = parseFloat(inter.totalTraValue) || 0;
+          if (totalTraValue > 0) {
+            const progress = totalPaid / totalTraValue;
+            paidInst = Math.round(progress * totalInst);
+          } else if (totalPaid > 0) {
+            paidInst = totalInst;
+          }
+        }
+
+        let currentStatus = inter.status;
+        if (paidInst >= totalInst && totalInst > 0) {
+          paidInst = totalInst;
+          currentStatus = 'Concluído';
+        }
+        if (currentStatus === 'Concluído') {
+          paidInst = totalInst;
+        }
+
+        let procedureClean = inter.procedure || '';
+        if (procedureClean.toUpperCase().startsWith('PROCEDIMENTO:')) {
+          procedureClean = procedureClean.substring(13).trim();
+        } else if (procedureClean.toUpperCase().startsWith('DIAGNÓSTICO:')) {
+          procedureClean = procedureClean.substring(12).trim();
+        }
+
+        return {
+          ...inter,
+          procedure: procedureClean,
+          status: currentStatus,
+          installments: totalInst.toString(),
+          totalInstallments: totalInst,
+          paidInstallments: paidInst,
+          paymentMethod,
+          payments: interPayments
+        };
+      });
+
     return NextResponse.json({
       transactions: allTransactions,
       pendingTransactions,
+      interventions: processedInterventions,
       summary: {
         income: totalIncome,
         expenses: totalExpense,

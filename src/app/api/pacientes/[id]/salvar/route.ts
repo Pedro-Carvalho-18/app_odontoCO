@@ -37,6 +37,7 @@ export async function POST(
     try {
       await db.run("BEGIN TRANSACTION");
 
+      let generatedTraId = '';
       try {
         for (const inter of interventions) {
           console.log(`[SAVE] Processing intervention:`, inter.procedure);
@@ -59,6 +60,7 @@ export async function POST(
 
           const lastTraRow = await db.get("SELECT MAX(CAST(NROTRA AS INTEGER)) as id FROM INTERVENCAO");
           const nextTraId = (Number(lastTraRow?.id) || 0) + 1;
+          generatedTraId = nextTraId.toString();
 
           const observText = inter.procedure?.startsWith("Atestado")
             ? `${inter.procedure} | ${inter.notes}`
@@ -230,7 +232,7 @@ export async function POST(
           }
         }
         await db.run("COMMIT");
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, nroTra: generatedTraId });
       } catch (error) {
         await db.run("ROLLBACK");
         throw error;

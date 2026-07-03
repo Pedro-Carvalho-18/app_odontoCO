@@ -8,7 +8,7 @@ export async function POST(
   try {
     const { id: patientId } = await params;
     const body = await request.json();
-    const { id, type, procedure, professionalId, value, status, notes, nroTra, paidInstallments } = body;
+    const { id, type, procedure, professionalId, value, status, notes, nroTra, paidInstallments, paidValue } = body;
 
     const db = await getDb();
 
@@ -16,6 +16,10 @@ export async function POST(
       const totalInst = Number(body.totalInstallments || body.installments || 1);
       let finalPaidInst = paidInstallments !== undefined ? Number(paidInstallments) : undefined;
       let finalStatus = status;
+
+      if (paidValue !== undefined) {
+        finalPaidInst = Math.min(totalInst, Math.max(0, Math.round((Number(paidValue) / (Number(value) || 1)) * totalInst)));
+      }
 
       // Synchronization logic:
       // 1. If status is Concluído, ensure all installments are marked as paid
@@ -93,48 +97,93 @@ export async function POST(
         }
       }
 
-      // Gerar registro financeiro na conta do paciente (CCPACIENTE) se houver novas parcelas pagas e valor > 0
-      if (finalPaidInst !== undefined && finalPaidInst > oldPaidInst && Number(value) > 0 && !procedure?.includes("Alteração Odontograma")) {
+      // Gerar registro financeiro na conta do paciente (CCPACIENTE)
+      if (Number(value) > 0 && !procedure?.includes("Alteração Odontograma")) {
         const valPerInst = (Number(value) || 0) / totalInst;
-        const diff = finalPaidInst - oldPaidInst;
         
-        console.log(`[FINANCE] Adding ${diff} installments for patient ${patientId}. Range: ${oldPaidInst + 1} to ${finalPaidInst}`);
-
-        for (let i = 1; i <= diff; i++) {
-          const currentInstallmentNumber = oldPaidInst + i;
-          const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
-          const nextId = (Number(lastIdRow?.id) || 0) + 1;
-          const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + '.000';
-          const today = new Date().toISOString().split('T')[0] + " 00:00:00.000";
-          
-          // Tentar pegar o nome limpo do procedimento
-          let procName = 'Procedimento';
-          if (procedure) {
-            procName = procedure.split('|')[0].replace('PROCEDIMENTO:', '').trim();
-          } else {
-            const row = await db.get("SELECT OBSERV FROM INTERVENCAO WHERE NROINTPAC = ?", [id]);
-            if (row?.OBSERV) {
-              procName = row.OBSERV.split('|')[0].replace('PROCEDIMENTO:', '').trim();
-            }
+        let procName = 'Procedimento';
+        if (procedure) {
+          procName = procedure.split('|')[0].replace('PROCEDIMENTO:', '').trim();
+        } else {
+          const row = await db.get("SELECT OBSERV FROM INTERVENCAO WHERE NROINTPAC = ?", [id]);
+          if (row?.OBSERV) {
+            procName = row.OBSERV.split('|')[0].replace('PROCEDIMENTO:', '').trim();
           }
+        }
+
+        if (paidValue !== undefined) {
+          // 1. Caso o valor pago seja enviado diretamente
+          console.log(`[FINANCE] Updating paid value for patient ${patientId} to R$ ${paidValue}`);
           
+          // Deletar pagamentos existentes de tipo '6' para esse tratamento
           await db.run(
-            `INSERT INTO CCPACIENTE (
-              REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
-              TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
-            ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?, ?)`,
-            [
-              nextId.toString(),
-              patientId,
-              today,
-              `Pg ${procName} (Parc ${currentInstallmentNumber}/${totalInst})`,
-              valPerInst.toFixed(2),
-              now,
-              today,
-              interTraId.toString(),
-              currentInstallmentNumber.toString()
-            ]
+            `DELETE FROM CCPACIENTE WHERE NROPAC = ? AND NROTRA = ? AND NROLAN = '6'`,
+            [patientId, interTraId.toString()]
           );
+          
+          if (Number(paidValue) > 0) {
+            const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+            const nextId = (Number(lastIdRow?.id) || 0) + 1;
+            const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + '.000';
+            const today = new Date().toISOString().split('T')[0] + " 00:00:00.000";
+            
+            await db.run(
+              `INSERT INTO CCPACIENTE (
+                REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+              ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?, ?)`,
+              [
+                nextId.toString(),
+                patientId,
+                today,
+                `Pg ${procName} (Valor Pago)`,
+                Number(paidValue).toFixed(2),
+                now,
+                today,
+                interTraId.toString(),
+                '1'
+              ]
+            );
+          }
+        } else if (finalPaidInst !== undefined && finalPaidInst !== oldPaidInst) {
+          // 2. Caso as parcelas pagas sejam atualizadas
+          console.log(`[FINANCE] Syncing installments for patient ${patientId}: from ${oldPaidInst} to ${finalPaidInst}`);
+          
+          if (finalPaidInst > oldPaidInst) {
+            // Adicionar novas parcelas
+            const diff = finalPaidInst - oldPaidInst;
+            for (let i = 1; i <= diff; i++) {
+              const currentInstallmentNumber = oldPaidInst + i;
+              const lastIdRow = await db.get("SELECT MAX(CAST(REGISTRO AS INTEGER)) as id FROM CCPACIENTE");
+              const nextId = (Number(lastIdRow?.id) || 0) + 1;
+              const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + '.000';
+              const today = new Date().toISOString().split('T')[0] + " 00:00:00.000";
+              
+              await db.run(
+                `INSERT INTO CCPACIENTE (
+                  REGISTRO, NROPAC, DATA, HISTORICO, NROLAN, NROIND, VALOR, 
+                  TIPO_PAGTO, USER_STAMP_INS, TIME_STAMP_INS, DATA_LANCAMENTO, NROTRA, NROPAR
+                ) VALUES (?, ?, ?, ?, '6', '255', ?, '1', '1', ?, ?, ?, ?)`,
+                [
+                  nextId.toString(),
+                  patientId,
+                  today,
+                  `Pg ${procName} (Parc ${currentInstallmentNumber}/${totalInst})`,
+                  valPerInst.toFixed(2),
+                  now,
+                  today,
+                  interTraId.toString(),
+                  currentInstallmentNumber.toString()
+                ]
+              );
+            }
+          } else {
+            // Remover parcelas extras
+            await db.run(
+              `DELETE FROM CCPACIENTE WHERE NROPAC = ? AND NROTRA = ? AND NROLAN = '6' AND CAST(NROPAR AS INTEGER) > ?`,
+              [patientId, interTraId.toString(), finalPaidInst]
+            );
+          }
         }
       }
 

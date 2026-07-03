@@ -77,6 +77,7 @@ export async function GET(
           ELSE '1'
         END as installments,
         COALESCE(TRIM(C.NOME), 'Particular') as convenio,
+        I.NROTRA as nroTra,
         DF.BITMAP as dentalStatus,
         DF.NRODEN as internalToothId,
         DF.FACE1, DF.FACE2, DF.FACE3, DF.FACE4, DF.FACE5,
@@ -145,6 +146,23 @@ export async function GET(
       [id]
     );
 
+    // Fetch all payment records for this patient from CCPACIENTE
+    const payments = await db.all(
+      `SELECT 
+        C.REGISTRO as id,
+        C.DATA as date,
+        C.VALOR as value,
+        C.NROTRA as nroTra,
+        C.NROPAR as installment,
+        C.HISTORICO as description,
+        COALESCE(TP.NOME, 'Particular') as paymentMethod
+      FROM CCPACIENTE C
+      LEFT JOIN __TIPO_PAGTO TP ON C.TIPO_PAGTO = TP.REGISTRO
+      WHERE C.NROPAC = ? AND C.NROLAN IN ('6', '7', '8', '105')
+      ORDER BY C.DATA DESC, CAST(C.REGISTRO AS INTEGER) DESC`,
+      [id]
+    );
+
     // After fetching, calculate paidInstallments in JS for more flexibility
     const processedInterventions = interventions
       .filter(inter => !inter.procedure?.includes("Alteração Odontograma"))
@@ -157,6 +175,19 @@ export async function GET(
       } else if (inter.installments) {
          totalInst = parseInt(inter.installments) || 1;
       }
+
+      // Parse payment method from notes/observ field if present
+      let paymentMethod = 'Não informado';
+      if (inter.notes && inter.notes.includes('Pagamento:')) {
+        const parts = inter.notes.split('|');
+        const payPart = parts.find((p: string) => p.includes('Pagamento:'));
+        if (payPart) {
+          paymentMethod = payPart.replace('Pagamento:', '').split('(')[0].trim();
+        }
+      }
+
+      // Filter payments belonging to this intervention (via NROTRA)
+      const interPayments = payments.filter(p => p.nroTra && String(p.nroTra) === String(inter.nroTra));
 
       // 2. Paid installments: use ORCAMENTO (from query) as primary source,
       //    fall back to financial calculation only if ORCAMENTO is not set
@@ -197,7 +228,9 @@ export async function GET(
         status: currentStatus,
         installments: totalInst.toString(),
         totalInstallments: totalInst,
-        paidInstallments: paidInst
+        paidInstallments: paidInst,
+        paymentMethod: paymentMethod,
+        payments: interPayments
       };
     });
 

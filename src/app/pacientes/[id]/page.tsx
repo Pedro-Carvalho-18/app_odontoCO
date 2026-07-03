@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense, Fragment } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -54,6 +54,8 @@ interface TreatmentItem {
   nroTra?: string;
   filesCount?: number;
   prescriptions?: string;
+  totalPaid?: number;
+  payments?: any[];
 }
 
 export default function PatientProfilePage() {
@@ -72,7 +74,14 @@ function PatientProfileContent() {
   const initialNroTra = searchParams.get("nroTra") || null;
 
   const [patient, setPatient] = useState<any>(null);
-  const [history, setHistory] = useState<{ history: TreatmentItem[], interventions: TreatmentItem[] } | null>(null);
+  const [history, setHistory] = useState<{ 
+    history: TreatmentItem[]; 
+    interventions: TreatmentItem[]; 
+    financialSummary?: {
+      totalValue: number;
+      totalPaid: number;
+    };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [activeFinanceSubTab, setActiveFinanceSubTab] = useState<"gestao" | "extrato">("gestao");
@@ -88,17 +97,18 @@ function PatientProfileContent() {
   const [patientEditForm, setPatientEditForm] = useState<any>({});
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
   const [editingValueText, setEditingValueText] = useState<string>("");
+  const [payFormValue, setPayFormValue] = useState("");
+  const [payFormMethodId, setPayFormMethodId] = useState("1");
+  const [payFormObs, setPayFormObs] = useState("");
+  const [expandedTraId, setExpandedTraId] = useState<string | null>(null);
   const [highlightedTra, setHighlightedTra] = useState<string | null>(null);
 
   // Calculate summary values from interventions in the history object
-  const totalValue = history?.interventions?.reduce((sum, inter) => sum + (Number(inter.value) || 0), 0) || 0;
+  const totalValue = history?.financialSummary?.totalValue ?? (history?.interventions?.reduce((sum, inter) => sum + (Number(inter.value) || 0), 0) || 0);
   
-  const totalPaid = history?.interventions?.reduce((sum, inter) => {
-    const totalInst = Number(inter.totalInstallments || inter.installments || 1);
-    const paidInst = Number(inter.paidInstallments || 0);
-    const valPerInst = (Number(inter.value) || 0) / totalInst;
-    return sum + (paidInst * valPerInst);
-  }, 0) || 0;
+  const totalPaid = history?.financialSummary?.totalPaid ?? (history?.interventions?.reduce((sum, inter) => {
+    return sum + (Number(inter.totalPaid) || 0);
+  }, 0) || 0);
 
   const balance = Math.max(0, totalValue - totalPaid);
 
@@ -152,7 +162,8 @@ function PatientProfileContent() {
   const [catalogOptions, setCatalogOptions] = useState<{
     professionals: any[];
     convenios: any[];
-  }>({ professionals: [], convenios: [] });
+    paymentMethods: any[];
+  }>({ professionals: [], convenios: [], paymentMethods: [] });
 
   async function loadData() {
     try {
@@ -167,7 +178,8 @@ function PatientProfileContent() {
 
       setCatalogOptions({
         professionals: cData.professionals || [],
-        convenios: cData.convenios || []
+        convenios: cData.convenios || [],
+        paymentMethods: cData.payments || []
       });
       
       const defaultAnamnesis = initialAnamnesisQuestions.map(q => ({
@@ -373,6 +385,8 @@ function PatientProfileContent() {
       setSaving(false);
     }
   };
+
+  // Inline paidValue editing removed in favor of register payment form
 
   const handleEditClick = () => {
     setEditForm({ ...selectedItem });
@@ -1192,7 +1206,7 @@ function PatientProfileContent() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Procedimento</th>
-                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest text-center">Parcelas Pagas</th>
+                          <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest text-center">Condições</th>
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Valor Pago / Total</th>
                           <th className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Status do Tratamento</th>
                         </tr>
@@ -1211,145 +1225,311 @@ function PatientProfileContent() {
                             const valPerInst = (inter.value || 0) / totalInst;
                             
                             return (
-                              <tr
-                                key={inter.id}
-                                data-nrotra={inter.nroTra}
-                                className={cn(
-                                  "transition-all duration-700",
-                                  inter.nroTra && highlightedTra === inter.nroTra
-                                    ? "bg-blue-50 ring-2 ring-inset ring-blue-400 shadow-md"
-                                    : "hover:bg-slate-50/50"
-                                )}
-                              >
-                                <td className="px-6 py-4">
-                                  <p className="text-sm font-black text-slate-900">{inter.procedure}</p>
-                                  <p className="text-[10px] font-black text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <input 
-                                      type="number"
-                                      min="0"
-                                      max={totalInst || 1}
-                                      className="w-12 bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm font-black text-center text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                      defaultValue={paidInst}
-                                      onBlur={async (e) => {
-                                        const newVal = parseInt(e.target.value);
-                                        if (newVal === paidInst) return;
-                                        
-                                        const newStatus = newVal >= totalInst ? "Concluído" : inter.status;
-                                        
-                                        setSaving(true);
-                                        try {
-                                          await fetch(`/api/pacientes/${id}/historico/atualizar`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ 
-                                              ...inter, 
-                                              paidInstallments: newVal, 
-                                              status: newStatus,
-                                              totalInstallments: totalInst
-                                            })
-                                          });
-                                          await loadData();
-                                        } catch (err) { console.error(err); } finally { setSaving(false); }
-                                      }}
-                                    />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase">de {totalInst}</span>
-                                  </div>
-                                </td>
-                                 <td className="px-6 py-4">
-                                   {editingValueId === inter.id ? (
-                                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                                       <span className="text-[9px] font-black text-slate-400 uppercase">Valor Total</span>
-                                       <div className="flex items-center gap-1.5">
-                                         <div className="relative flex items-center">
-                                           <span className="absolute left-2.5 text-xs font-black text-slate-400">R$</span>
-                                           <input 
-                                             type="text"
-                                             className="w-24 bg-white border border-slate-200 rounded-xl pl-8 pr-2.5 py-1.5 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                             value={editingValueText}
-                                             onChange={(e) => {
-                                               const val = e.target.value.replace(/[^0-9.,]/g, '');
-                                               setEditingValueText(val);
-                                             }}
-                                             autoFocus
-                                             onKeyDown={async (e) => {
-                                               if (e.key === 'Enter') {
-                                                 await handleSaveValue(inter);
-                                               } else if (e.key === 'Escape') {
-                                                 setEditingValueId(null);
-                                               }
-                                             }}
-                                           />
+                              <Fragment key={inter.id}>
+                                <tr
+                                  data-nrotra={inter.nroTra}
+                                  className={cn(
+                                    "transition-all duration-700 cursor-pointer select-none",
+                                    inter.nroTra && highlightedTra === inter.nroTra
+                                      ? "bg-blue-50 ring-2 ring-inset ring-blue-400 shadow-md"
+                                      : "hover:bg-slate-50/50",
+                                    expandedTraId === inter.id && "bg-slate-50/70"
+                                  )}
+                                  onClick={() => setExpandedTraId(expandedTraId === inter.id ? null : inter.id)}
+                                >
+                                  <td className="px-6 py-4">
+                                    <p className="text-sm font-black text-slate-900">{inter.procedure}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase">{new Date(inter.date).toLocaleDateString('pt-BR')} • {inter.professional}</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <p className="text-sm font-black text-slate-900">
+                                      {inter.paymentMethod || "Não informado"}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                                      {totalInst} {totalInst === 1 ? "parcela" : "parcelas"}
+                                    </p>
+                                  </td>
+                                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                     <div className="flex flex-col gap-1">
+                                       {/* Seção do Valor Pago (Estático) */}
+                                       <div className="p-1 -ml-1">
+                                         <p className="text-xs font-black text-slate-900 flex items-center gap-1">
+                                           <span className="text-[9px] text-slate-400 font-bold uppercase">Pago:</span>
+                                           R$ {Number(inter.totalPaid || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                         </p>
+                                       </div>
+
+                                       {/* Seção do Valor Total */}
+                                       {editingValueId === inter.id ? (
+                                         <div className="flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200 mt-1">
+                                           <span className="text-[8px] font-black text-slate-400 uppercase">Valor Total</span>
+                                           <div className="flex items-center gap-1">
+                                             <div className="relative flex items-center">
+                                               <span className="absolute left-2 text-[10px] font-black text-slate-400">R$</span>
+                                               <input 
+                                                 type="text"
+                                                 className="w-20 bg-white border border-slate-200 rounded-lg pl-6 pr-1.5 py-1 text-[11px] font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                 value={editingValueText}
+                                                 onChange={(e) => {
+                                                   const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                                   setEditingValueText(val);
+                                                 }}
+                                                 autoFocus
+                                                 onKeyDown={async (e) => {
+                                                   if (e.key === 'Enter') {
+                                                     await handleSaveValue(inter);
+                                                   } else if (e.key === 'Escape') {
+                                                     setEditingValueId(null);
+                                                   }
+                                                 }}
+                                               />
+                                             </div>
+                                             <button 
+                                               onClick={async () => await handleSaveValue(inter)}
+                                               className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center justify-center shadow-sm"
+                                               title="Salvar"
+                                             >
+                                               <Check size={12} className="stroke-[3]" />
+                                             </button>
+                                             <button 
+                                               onClick={() => setEditingValueId(null)}
+                                               className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-md transition-colors flex items-center justify-center"
+                                               title="Cancelar"
+                                             >
+                                               <X size={12} className="stroke-[3]" />
+                                             </button>
+                                           </div>
                                          </div>
-                                         <button 
-                                           onClick={async () => await handleSaveValue(inter)}
-                                           className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center shadow-sm"
-                                           title="Salvar"
+                                       ) : (
+                                         <div 
+                                           className="group relative cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-colors -ml-1"
+                                           title="Clique para editar o valor total"
+                                           onClick={() => {
+                                             setEditingValueId(inter.id);
+                                             setEditingValueText(inter.value.toString());
+                                           }}
                                          >
-                                           <Check size={14} className="stroke-[3]" />
-                                         </button>
-                                         <button 
-                                           onClick={() => setEditingValueId(null)}
-                                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-colors flex items-center justify-center"
-                                           title="Cancelar"
-                                         >
-                                           <X size={14} className="stroke-[3]" />
-                                         </button>
-                                       </div>
+                                           <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                             <span className="text-[9px] text-slate-400 font-bold uppercase">Total:</span>
+                                             R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                             <Edit2 size={8} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                                           </p>
+                                         </div>
+                                       )}
                                      </div>
-                                   ) : (
-                                     <div 
-                                       className="group relative cursor-pointer hover:bg-slate-50 p-2 rounded-2xl transition-colors -m-2"
-                                       title="Clique para editar o valor"
-                                       onClick={() => {
-                                         setEditingValueId(inter.id);
-                                         setEditingValueText(inter.value.toString());
-                                       }}
-                                     >
-                                       <p className="text-xs font-black text-slate-900">
-                                         R$ {(paidInst * valPerInst).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                       </p>
-                                       <div className="flex items-center gap-1 mt-0.5">
-                                         <p className="text-[9px] font-bold text-slate-400 uppercase">Total: R$ {inter.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                         <Edit2 size={10} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                                       </div>
-                                     </div>
-                                   )}
-                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                                    {["Em Aberto", "Concluído"].map(s => (
-                                      <button
-                                        key={s}
-                                        onClick={async () => {
-                                          if (inter.status === s) return;
-                                          const newPaidInst = s === "Concluído" ? totalInst : paidInst;
-                                          
-                                          setSaving(true);
-                                          try {
-                                            await fetch(`/api/pacientes/${id}/historico/atualizar`, {
-                                              method: 'POST',
-                                              headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({ ...inter, status: s, paidInstallments: newPaidInst })
-                                            });
-                                            await loadData();
-                                          } catch (err) { console.error(err); } finally { setSaving(false); }
-                                        }}
-                                        className={cn(
-                                          "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all",
-                                          inter.status === s 
-                                            ? (s === "Concluído" ? "bg-emerald-500 text-white shadow-sm" : "bg-amber-500 text-white shadow-sm")
-                                            : "text-slate-400 hover:text-slate-600"
-                                        )}
-                                      >
-                                        {s.split(' ')[0]}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </td>
-                              </tr>
+                                  </td>
+                                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                                      {["Em Aberto", "Concluído"].map(s => (
+                                        <button
+                                          key={s}
+                                          onClick={async () => {
+                                            if (inter.status === s) return;
+                                            const newPaidInst = s === "Concluído" ? totalInst : paidInst;
+                                            
+                                            setSaving(true);
+                                            try {
+                                              await fetch(`/api/pacientes/${id}/historico/atualizar`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ ...inter, status: s, paidInstallments: newPaidInst })
+                                              });
+                                              await loadData();
+                                            } catch (err) { console.error(err); } finally { setSaving(false); }
+                                          }}
+                                          className={cn(
+                                            "px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all",
+                                            inter.status === s 
+                                              ? (s === "Concluído" ? "bg-emerald-500 text-white shadow-sm" : "bg-amber-500 text-white shadow-sm")
+                                              : "text-slate-400 hover:text-slate-600"
+                                          )}
+                                        >
+                                          {s.split(' ')[0]}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+
+                                {expandedTraId === inter.id && (
+                                  <tr className="bg-slate-50/30">
+                                    <td colSpan={4} className="px-6 py-4 border-t border-b border-slate-100" onClick={(e) => e.stopPropagation()}>
+                                      <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-5 animate-in fade-in slide-in-from-top-1 duration-300">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                          <h5 className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                            <History size={14} className="text-blue-500" />
+                                            Gerenciamento do Pagamento
+                                          </h5>
+                                          <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                            ID Tratamento: {inter.nroTra}
+                                          </span>
+                                        </div>
+
+                                        {/* Form para Lançar Novo Pagamento (No topo) */}
+                                        <div className="bg-slate-50/70 rounded-2xl border border-slate-200/60 p-4 space-y-3">
+                                          <h6 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+                                            <Plus size={12} className="stroke-[3]" />
+                                            Lançar Novo Recebimento / Pagamento
+                                          </h6>
+                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="flex flex-col gap-1">
+                                              <label className="text-[8px] font-black text-slate-400 uppercase">Valor</label>
+                                              <div className="relative flex items-center">
+                                                <span className="absolute left-2.5 text-xs font-black text-slate-400">R$</span>
+                                                <input 
+                                                  type="text"
+                                                  placeholder="0,00"
+                                                  className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-2.5 py-1.5 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                  value={payFormValue}
+                                                  onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                                    setPayFormValue(val);
+                                                  }}
+                                                />
+                                              </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                              <label className="text-[8px] font-black text-slate-400 uppercase">Forma de Pagamento</label>
+                                              <select 
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                value={payFormMethodId}
+                                                onChange={(e) => setPayFormMethodId(e.target.value)}
+                                              >
+                                                {catalogOptions.paymentMethods?.map((m) => (
+                                                  <option key={m.id} value={m.id}>{m.name}</option>
+                                                ))}
+                                              </select>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                              <label className="text-[8px] font-black text-slate-400 uppercase">Observação</label>
+                                              <input 
+                                                type="text"
+                                                placeholder="Ex: Pix, Cartão, Dinheiro..."
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                value={payFormObs}
+                                                onChange={(e) => setPayFormObs(e.target.value)}
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex justify-end pt-1">
+                                            <button
+                                              onClick={async () => {
+                                                const parsedVal = parseFloat(payFormValue.replace(",", "."));
+                                                if (isNaN(parsedVal) || parsedVal <= 0) return;
+
+                                                setSaving(true);
+                                                try {
+                                                  const res = await fetch("/api/financeiro/pagar", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({
+                                                      nroTra: inter.nroTra,
+                                                      nroPac: id,
+                                                      value: parsedVal,
+                                                      description: payFormObs || `Pg ${inter.procedure.split('|')[0].replace('PROCEDIMENTO:', '').trim()}`,
+                                                      paymentMethodId: payFormMethodId,
+                                                      nroPar: "1"
+                                                    })
+                                                  });
+                                                  if (res.ok) {
+                                                    setPayFormValue("");
+                                                    setPayFormObs("");
+                                                    await loadData();
+                                                  }
+                                                } catch (err) {
+                                                  console.error(err);
+                                                } finally {
+                                                  setSaving(false);
+                                                }
+                                              }}
+                                              disabled={saving}
+                                              className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                                            >
+                                              Lançar Pagamento
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Histórico com interface de Linha do Tempo (Timeline) */}
+                                        <div className="space-y-4 pt-2">
+                                          <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            Histórico de Lançamentos
+                                          </h6>
+                                          {inter.payments && inter.payments.length > 0 ? (
+                                            <div className="relative border-l-2 border-blue-100 pl-6 ml-3 space-y-5 py-1">
+                                              {inter.payments.map((p: any) => (
+                                                <div key={p.id} className="relative flex justify-between items-start text-xs font-black">
+                                                  {/* Ponto da Linha do Tempo */}
+                                                  <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-blue-500 bg-white shadow-sm flex items-center justify-center">
+                                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                                  </div>
+                                                  
+                                                  <div className="flex-1 pr-4">
+                                                    <p className="font-black text-slate-800">
+                                                      {p.paymentMethod || "Não informado"}
+                                                    </p>
+                                                    {p.description && (
+                                                      <p className="text-[11px] font-bold text-slate-600 italic mt-0.5 animate-in fade-in duration-200">
+                                                        {"\"" + p.description + "\""}
+                                                      </p>
+                                                    )}
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                                                      Lançado em {new Date(p.date).toLocaleDateString('pt-BR')} {p.installment ? `• Parcela ${p.installment}` : ""}
+                                                    </p>
+                                                  </div>
+                                                  
+                                                  <div className="flex items-center gap-3">
+                                                    <div className="text-right">
+                                                      <p className="font-black text-emerald-600 text-sm">
+                                                        R$ {Number(p.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                      </p>
+                                                    </div>
+                                                    <button
+                                                      onClick={async () => {
+                                                        if (!confirm("Tem certeza que deseja excluir este lançamento de pagamento?")) return;
+                                                        setSaving(true);
+                                                        try {
+                                                          const res = await fetch("/api/financeiro/pagar/excluir", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({
+                                                              registroId: p.id,
+                                                              nroTra: inter.nroTra
+                                                            })
+                                                          });
+                                                          if (res.ok) {
+                                                            await loadData();
+                                                          }
+                                                        } catch (err) {
+                                                          console.error(err);
+                                                        } finally {
+                                                          setSaving(false);
+                                                        }
+                                                      }}
+                                                      disabled={saving}
+                                                      className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                      title="Excluir lançamento"
+                                                    >
+                                                      <Trash2 size={13} className="stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-slate-400 font-bold uppercase py-1">
+                                              Nenhum lançamento de pagamento encontrado.
+                                            </p>
+                                          )}
+                                        </div>
+
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
                             );
                           })
                         )}

@@ -1,6 +1,6 @@
 {
   "name": "app_odonto",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Sistema de Gestão Odontológica OdontoCO",
   "author": "OdontoCO",
   "private": true,
@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "pre-dist": "npm run build && powershell -NoProfile -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/static; Copy-Item -Recurse -Force public .next/standalone/public; if (Test-Path .next/standalone/node_modules) { Rename-Item -Path .next/standalone/node_modules -NewName next_modules -Force }\"",
+    "pre-dist": "npm run build && powershell -NoProfile -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/static; Copy-Item -Recurse -Force public .next/standalone/public; if (Test-Path .next/standalone/node_modules) { Rename-Item -Path .next/standalone/node_modules -NewName next_modules -Force }; Get-ChildItem -Path .next/standalone -Exclude .next,next_modules,public,server.js | Remove-Item -Recurse -Force\"",
     "dist": "npm run pre-dist && electron-builder --win",
     "clean-cache": "powershell -NoProfile -Command \"Remove-Item -Recurse -Force $env:LOCALAPPDATA\\electron-builder\\Cache\""
   },
